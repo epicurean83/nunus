@@ -162,7 +162,7 @@
   /* subjective input */
   .type-input-row{display:flex; gap:10px}
   .type-input{
-    flex:1; border:2px solid var(--line); background:var(--paper); color:var(--ink);
+    flex:1; min-width:0; border:2px solid var(--line); background:var(--paper); color:var(--ink);
     border-radius:14px; padding:14px 16px; font-size:1.3rem; font-weight:700; text-align:center;
     outline:none; transition:border-color .15s ease;
   }
@@ -237,6 +237,12 @@
   .chain-endbox{text-align:center; padding:8px 0}
   .chain-endbox .big{font-size:1.9rem; font-weight:900; margin-bottom:4px}
   #chain-record{color:var(--gold); font-weight:800; margin-bottom:6px}
+  button.score-pill{border:none; cursor:pointer; color:var(--ink); font-family:inherit}
+  button.score-pill:active{transform:scale(.94)}
+  .overlay{position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; padding:24px; z-index:50}
+  .overlay-card{background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow-lg); padding:22px 20px; width:100%; max-width:440px; max-height:80vh; overflow:auto; display:flex; flex-direction:column; gap:16px; text-align:center}
+  .overlay-title{font-size:1.3rem; font-weight:900}
+  .overlay .chain-flow{justify-content:center}
 
   /* 큰 화면(갤럭시 폴드 펼침 등): 세로 중앙 정렬 + 여유 폭 */
   @media (min-width:640px){
@@ -389,7 +395,7 @@
       <button class="iconbtn" id="btn-chain-home" title="홈으로">←</button>
       <div class="title">🔤 끝말잇기</div>
       <div class="spacer"></div>
-      <div class="score-pill">🔗 <span id="chain-count">0</span> · 최고 <span id="chain-best">0</span></div>
+      <button class="score-pill" id="chain-record-btn" title="최고 기록 보기">🔗 <span id="chain-count">0</span> · 최고 <span id="chain-best">0</span> 👀</button>
     </div>
     <div class="card">
       <div class="chain-flow" id="chain-flow"></div>
@@ -416,6 +422,15 @@
       </div>
     </div>
   </section>
+
+  <!-- ============ RECORD OVERLAY ============ -->
+  <div id="chain-record-overlay" class="overlay hidden">
+    <div class="overlay-card">
+      <div class="overlay-title" id="record-title"></div>
+      <div class="chain-flow" id="record-flow"></div>
+      <button class="btn btn-primary" id="record-close">닫기</button>
+    </div>
+  </div>
 
 </div>
 
@@ -951,15 +966,22 @@ function updateHomeProgress(){
 const BEST_KEY = "nachmal.chain.best.v1";
 function loadBest(){ try{ const n = parseInt(localStorage.getItem(BEST_KEY),10); return Number.isFinite(n) && n>0 ? n : 0; }catch(e){ return 0; } }
 function saveBest(n){ try{ localStorage.setItem(BEST_KEY, String(n)); }catch(e){} }
+const BESTWORDS_KEY = "nachmal.chain.bestwords.v1";
+function loadBestWords(){ try{ const a = JSON.parse(localStorage.getItem(BESTWORDS_KEY)); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
+function saveBestWords(arr){ try{ localStorage.setItem(BESTWORDS_KEY, JSON.stringify(arr)); }catch(e){} }
 let chainWords = [];
 let chainBest = loadBest();
+let chainBestWords = loadBestWords();
 
-function renderChain(){
-  const flow = $('chain-flow'); flow.innerHTML = '';
-  chainWords.forEach((w,i)=>{
-    if(i>0){ const a=document.createElement('span'); a.className='arr'; a.textContent='→'; flow.appendChild(a); }
-    const s=document.createElement('span'); s.className='cw'+(i===chainWords.length-1?' last':''); s.textContent=w; flow.appendChild(s);
+function renderWords(el, words){
+  el.innerHTML = '';
+  words.forEach((w,i)=>{
+    if(i>0){ const a=document.createElement('span'); a.className='arr'; a.textContent='→'; el.appendChild(a); }
+    const s=document.createElement('span'); s.className='cw'+(i===words.length-1?' last':''); s.textContent=w; el.appendChild(s);
   });
+}
+function renderChain(){
+  renderWords($('chain-flow'), chainWords);
   const need = chainWords.length ? [...chainWords[chainWords.length-1]].pop() : '';
   $('chain-need').textContent = need ? `다음은 ‘${need}’로 시작!` : '';
   $('chain-count').textContent = chainWords.length;
@@ -996,7 +1018,7 @@ function submitChain(){
     $('chain-input').select();
   }
 }
-function finalizeBest(){ if(chainWords.length > chainBest){ chainBest = chainWords.length; saveBest(chainBest); return true; } return false; }
+function finalizeBest(){ if(chainWords.length > chainBest){ chainBest = chainWords.length; chainBestWords = chainWords.slice(); saveBest(chainBest); saveBestWords(chainBestWords); return true; } return false; }
 function endChain(){
   const rec = finalizeBest();
   $('chain-play').classList.add('hidden');
@@ -1006,6 +1028,17 @@ function endChain(){
   $('chain-best').textContent = chainBest;
 }
 function leaveChain(){ finalizeBest(); show('home'); }
+function openRecord(){
+  if(chainBestWords.length){
+    $('record-title').textContent = `🏆 최고 기록 ${chainBest}개`;
+    renderWords($('record-flow'), chainBestWords);
+  }else{
+    $('record-title').textContent = chainBest>0 ? `🏆 최고 기록 ${chainBest}개` : '아직 최고 기록이 없어요!';
+    $('record-flow').textContent = chainBest>0 ? '낱말 기록은 다음 기록부터 저장돼요.' : '낱말을 이어서 기록을 세워 보세요!';
+  }
+  $('chain-record-overlay').classList.remove('hidden');
+}
+function closeRecord(){ $('chain-record-overlay').classList.add('hidden'); }
 
 /* ================= 이벤트 바인딩 ================= */
 document.querySelectorAll('.mode-card').forEach(c=>{
@@ -1037,6 +1070,9 @@ $('chain-end').addEventListener('click', endChain);
 $('chain-restart').addEventListener('click', startChain);
 $('btn-chain-home').addEventListener('click', leaveChain);
 $('chain-home2').addEventListener('click', leaveChain);
+$('chain-record-btn').addEventListener('click', openRecord);
+$('record-close').addEventListener('click', closeRecord);
+$('chain-record-overlay').addEventListener('click', e=>{ if(e.target === $('chain-record-overlay')) closeRecord(); });
 
 /* ================= 시작 ================= */
 initTheme();

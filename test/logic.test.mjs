@@ -321,3 +321,11 @@ test('index.html: 끝말잇기 화면/배선', () => {
   assert.ok(html.includes("if(m==='chain') startChain()"));
   assert.ok(html.includes('nachmal.chain.best.v1'));
 });
+test('index.html: 최고 기록 체인 보기', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.ok(html.includes('id="chain-record-overlay"'));
+  assert.ok(html.includes('id="chain-record-btn"'));
+  assert.ok(html.includes('nachmal.chain.bestwords.v1'));
+  assert.ok(html.includes('function openRecord'));
+  assert.ok(html.includes('function renderWords'));
+});
