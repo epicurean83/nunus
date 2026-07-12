@@ -102,8 +102,9 @@
   .mode-card.type .emoji{background:var(--green-soft)}
   .mode-card .mc-title{font-weight:800; font-size:1.18rem; letter-spacing:-.02em}
   .mode-card .mc-desc{color:var(--ink-soft); font-size:.9rem; margin-top:3px; line-height:1.4}
+  .mode-card .mc-progress{color:var(--green); font-weight:800; font-size:.8rem; margin-top:6px}
 
-  .home-foot{margin-top:auto; padding-top:22px; text-align:center}
+  .home-foot{margin-top:auto; padding-top:22px; display:flex; flex-direction:column; gap:10px; align-items:center}
   .ghostbtn{
     border:1.5px solid var(--line); background:transparent; color:var(--ink-soft);
     padding:11px 18px; border-radius:12px; font-size:.9rem; font-weight:700;
@@ -259,6 +260,7 @@
         <div>
           <div class="mc-title">객관식 모드</div>
           <div class="mc-desc">네 개의 보기 중에서 정답 고르기 · 틀리면 오답이 하나씩 사라져요</div>
+          <div class="mc-progress" id="prog-choice"></div>
         </div>
       </button>
       <button class="mode-card type" data-mode="type">
@@ -266,12 +268,14 @@
         <div>
           <div class="mc-title">주관식 모드</div>
           <div class="mc-desc">보기 없이 직접 입력하기 · 틀릴 때마다 자음→모음→받침 힌트가 늘어나요</div>
+          <div class="mc-progress" id="prog-type"></div>
         </div>
       </button>
     </div>
 
     <div class="home-foot">
       <button class="ghostbtn" id="btn-edit">✎ 낱말 편집하기</button>
+      <button class="ghostbtn" id="btn-reset-progress">↺ 진도 초기화</button>
     </div>
     <div class="footer-tag" id="word-count-tag"></div>
   </section>
@@ -334,10 +338,11 @@
         <div class="big" id="result-emoji">🎉</div>
         <h2 id="result-title">참 잘했어요!</h2>
         <div class="stat">한 번에 맞힌 낱말 <b id="result-score">0</b> / <span id="result-total">0</span></div>
+        <div class="stat" id="result-progress"></div>
       </div>
       <div class="actions">
         <button class="btn btn-soft" id="btn-result-home">홈으로</button>
-        <button class="btn btn-primary" id="btn-retry">다시 풀기</button>
+        <button class="btn btn-primary" id="btn-retry">다음 7문제 →</button>
       </div>
     </div>
   </section>
@@ -473,6 +478,22 @@ function templateFromV1(prompt, answer){
   if(!a.length) return null;
   return `${prompt} [${a[0]}]${a.slice(1).join('')}`;
 }
+function pickRound(allTemplates, playedTemplates, size){
+  const all = Array.from(new Set(allTemplates));
+  const cap = Math.min(size, all.length);
+  const playedSet = new Set(playedTemplates.filter(t => all.includes(t)));
+  let reset = false;
+  let unplayed = all.filter(t => !playedSet.has(t));
+  if(all.length > 0 && unplayed.length === 0){
+    reset = true; playedSet.clear(); unplayed = all.slice();
+  }
+  const round = [];
+  for(const t of shuffle(unplayed)){ if(round.length >= cap) break; round.push(t); playedSet.add(t); }
+  if(round.length < cap){
+    for(const t of shuffle(all.filter(x => !round.includes(x)))){ if(round.length >= cap) break; round.push(t); }
+  }
+  return { round: shuffle(round), played: Array.from(playedSet), reset };
+}
 /* CORE:END */
 
 const STORE_KEY_V1 = "nachmal.words.v1";
@@ -511,6 +532,18 @@ function loadWords(){
 function saveWords(words){
   try{ localStorage.setItem(STORE_KEY_V2, JSON.stringify(words.map(w=>w.template))); }catch(e){}
 }
+const PROGRESS_KEY = "nachmal.progress.v1";
+const ROUND_SIZE = 7;
+function loadProgress(){
+  try{
+    const raw = localStorage.getItem(PROGRESS_KEY);
+    if(raw){ const o = JSON.parse(raw); return { choice: Array.isArray(o.choice)?o.choice:[], type: Array.isArray(o.type)?o.type:[] }; }
+  }catch(e){}
+  return { choice: [], type: [] };
+}
+function saveProgress(){ try{ localStorage.setItem(PROGRESS_KEY, JSON.stringify(PROGRESS)); }catch(e){} }
+let PROGRESS = loadProgress();
+function totalProblems(){ return new Set(WORDS.map(w=>w.template)).size; }
 
 /* ================= DOM ================= */
 const $ = id => document.getElementById(id);
@@ -519,6 +552,7 @@ const screens = {
 };
 function show(name){
   for(const k in screens) screens[k].classList.toggle('hidden', k!==name);
+  if(name==='home') updateHomeProgress();
   window.scrollTo(0,0);
 }
 
@@ -586,14 +620,14 @@ function speak(text){
 
 /* ================= 퀴즈 시작 ================= */
 function startQuiz(mode){
+  const all = WORDS.map(w=>w.template);
+  const { round, played } = pickRound(all, PROGRESS[mode] || [], ROUND_SIZE);
+  PROGRESS[mode] = played; saveProgress();
+  const idx = new Map(WORDS.map((w,i)=>[w.template, i]));
+  const order = round.map(t => idx.get(t)).filter(i => i != null);
   state = {
-    mode,
-    order: shuffle(WORDS.map((_,i)=>i)),
-    i: 0,
-    score: 0,
-    hintLevel: 0,
-    done: false,
-    options: []
+    mode, order, i:0, score:0, hintLevel:0, done:false, options:[],
+    coverageDone: played.length === totalProblems()
   };
   $('mode-title').textContent = mode==='choice' ? '객관식 모드' : '주관식 모드';
   $('q-total').textContent = state.order.length;
@@ -789,6 +823,13 @@ function showResult(){
   else { emoji='💪'; title='다시 도전해 볼까요?'; }
   $('result-emoji').textContent = emoji;
   $('result-title').textContent = title;
+  const experienced = (PROGRESS[state.mode] || []).length;
+  const totalWords = totalProblems();
+  $('result-progress').textContent = `문제 경험 ${experienced}/${totalWords}`;
+  if(state.coverageDone){
+    $('result-emoji').textContent = '🏆';
+    $('result-title').textContent = '모든 문제를 한 번씩 다 만났어요!';
+  }
   show('result');
 }
 
@@ -817,6 +858,7 @@ function saveEditor(){
   msg.textContent = `저장했어요! (${arr.length}개 문제)`;
   msg.className='edit-msg ok';
   updateHomeCount();
+  updateHomeProgress();
 }
 function resetEditor(){
   $('editor').value = DEFAULT_TEMPLATES.join('\n');
@@ -826,6 +868,18 @@ function resetEditor(){
 
 function updateHomeCount(){
   $('word-count-tag').textContent = `현재 ${WORDS.length}개의 낱말`;
+}
+
+function updateHomeProgress(){
+  const total = totalProblems();
+  [['choice','prog-choice'],['type','prog-type']].forEach(([mode,id])=>{
+    const n = (PROGRESS[mode] || []).filter(t => WORDS.some(w => w.template === t)).length;
+    let txt;
+    if(n <= 0) txt = `새 판! 0/${total}`;
+    else if(n >= total) txt = `한 판 완주 🏆 · 다음 판 준비`;
+    else txt = `이번 판 ${n}/${total}`;
+    $(id).textContent = txt;
+  });
 }
 
 /* ================= 이벤트 바인딩 ================= */
@@ -846,10 +900,16 @@ $('btn-edit').addEventListener('click', openEditor);
 $('btn-edit-back').addEventListener('click', ()=>show('home'));
 $('btn-save').addEventListener('click', saveEditor);
 $('btn-reset').addEventListener('click', resetEditor);
+$('btn-reset-progress').addEventListener('click', ()=>{
+  if(confirm('객관식·주관식 진도를 모두 초기화할까요?')){
+    PROGRESS = { choice: [], type: [] }; saveProgress(); updateHomeProgress();
+  }
+});
 
 /* ================= 시작 ================= */
 initTheme();
 updateHomeCount();
+updateHomeProgress();
 show('home');
 </script>
 </body>

@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 const CORE_NAMES = [
   'CHO','JUNG','JONG','decompose','compose','norm','shuffle','hintLabel',
   'parseTemplate','DEFAULT_TEMPLATES','DEFAULT_WORDS','buildAnswerBoxes',
-  'isCorrectTyped','makeLetterDistractors','makeOptions','templateFromV1'
+  'isCorrectTyped','makeLetterDistractors','makeOptions','templateFromV1','pickRound'
 ];
 
 function loadCore(){
@@ -179,4 +179,89 @@ test('index.html: 편집기 template 형식', () => {
   assert.ok(html.includes('WORDS.map(w=>w.template)'));
   assert.ok(html.includes('DEFAULT_TEMPLATES.join'));
   assert.ok(html.includes('const w = parseTemplate(line)'));
+});
+
+test('pickRound: 기본 라운드 7개, 새 문제 우선', () => {
+  const { pickRound, DEFAULT_TEMPLATES } = loadCore();
+  const all = DEFAULT_TEMPLATES;
+  const r = pickRound(all, [], 7);
+  assert.equal(r.round.length, 7);
+  assert.equal(new Set(r.round).size, 7);
+  assert.ok(r.round.every(t => all.includes(t)));
+  assert.equal(r.reset, false);
+  assert.equal(new Set(r.played).size, 7);
+  assert.ok(r.round.every(t => r.played.includes(t)));
+});
+test('pickRound: 5판이면 31개 모두 경험, 매 판 7개, 6판째 reset', () => {
+  const { pickRound, DEFAULT_TEMPLATES } = loadCore();
+  const all = DEFAULT_TEMPLATES;              // 31개
+  let played = [];
+  const rounds = [];
+  for(let i=0;i<5;i++){ const r = pickRound(all, played, 7); played = r.played; rounds.push(r); }
+  assert.ok(rounds.every(r => r.round.length === 7));
+  assert.ok(rounds.every(r => r.reset === false));
+  assert.equal(new Set(played).size, 31);
+  const r6 = pickRound(all, played, 7);
+  assert.equal(r6.reset, true);
+  assert.equal(r6.round.length, 7);
+  assert.equal(new Set(r6.played).size, 7);
+});
+test('pickRound: 안 푼 게 부족하면 복습으로 채워 항상 cap', () => {
+  const { pickRound, DEFAULT_TEMPLATES } = loadCore();
+  const all = DEFAULT_TEMPLATES;
+  const played = all.slice(0, 28);            // 28 경험, 3 남음
+  const r = pickRound(all, played, 7);
+  assert.equal(r.round.length, 7);
+  assert.ok(all.slice(28).every(t => r.round.includes(t)));  // 남은 새 문제 우선 포함
+  assert.equal(new Set(r.played).size, 31);
+});
+test('pickRound: 문제 수가 size보다 적으면 전체 한 판', () => {
+  const { pickRound } = loadCore();
+  const r = pickRound(['a','b','c'], [], 7);
+  assert.equal(r.round.length, 3);
+  assert.equal(new Set(r.round).size, 3);
+});
+test('pickRound: 중복 템플릿 입력이어도 라운드는 서로 다름', () => {
+  const { pickRound } = loadCore();
+  const r = pickRound(['a','a','b','c'], [], 7);
+  assert.equal(r.round.length, 3);                 // 고유 3개
+  assert.equal(new Set(r.round).size, r.round.length);
+});
+test('pickRound: 현재 목록에 없는 옛 진도는 무시', () => {
+  const { pickRound } = loadCore();
+  const r = pickRound(['a','b','c'], ['a','x','y'], 2);
+  assert.ok(!r.played.includes('x'));
+  assert.ok(!r.played.includes('y'));
+  assert.ok(r.round.every(t => ['a','b','c'].includes(t)));
+});
+test('pickRound: 빈 목록은 빈 라운드', () => {
+  const { pickRound } = loadCore();
+  const r = pickRound([], [], 7);
+  assert.deepEqual(r, { round: [], played: [], reset: false });
+});
+test('index.html: 라운드/진도 배선', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.ok(html.includes('nachmal.progress.v1'));
+  assert.ok(html.includes('const ROUND_SIZE = 7'));
+  assert.ok(html.includes('pickRound(all, PROGRESS[mode]'));
+  assert.ok(html.includes('coverageDone'));
+});
+test('index.html: 결과 화면 진도/버튼', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.ok(html.includes('id="result-progress"'));
+  assert.ok(html.includes('다음 7문제'));
+  assert.ok(html.includes('문제 경험 ${experienced}/${totalWords}'));
+  assert.ok(!html.includes('다시 풀기'));
+});
+test('index.html: 홈 진도 표시 + 초기화', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.ok(html.includes('id="prog-choice"'));
+  assert.ok(html.includes('id="prog-type"'));
+  assert.ok(html.includes('id="btn-reset-progress"'));
+  assert.ok(html.includes('function updateHomeProgress'));
+});
+
+test('index.html: 홈 진입 시 진도 갱신', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.ok(html.includes("if(name==='home') updateHomeProgress()"));
 });
