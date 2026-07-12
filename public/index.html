@@ -126,12 +126,17 @@
   }
   .prompt-block{text-align:center}
   .prompt-label{color:var(--ink-soft); font-size:.85rem; font-weight:700; margin-bottom:8px}
-  .prompt-word{
-    font-size:2.4rem; font-weight:900; letter-spacing:-.03em; line-height:1.1;
-    display:inline-flex; align-items:baseline; gap:.15em; flex-wrap:wrap; justify-content:center;
+  .phrase{
+    font-size:2.3rem; font-weight:900; letter-spacing:-.02em; line-height:1.5;
+    text-align:center; word-break:keep-all;
   }
-  .prompt-word .obj{color:var(--ink)}
-  .prompt-word .blank{color:var(--sky)}
+  .phrase .ctx{ color:var(--ink); }
+  .phrase .box{
+    display:inline-grid; place-items:center; vertical-align:-.22em;
+    width:auto; min-width:1.35em; height:1.5em; padding:0 .12em; margin:0 .06em;
+    font-size:.95em; border-radius:.28em; border:2px dashed var(--line); color:var(--ink);
+    background:transparent;
+  }
   .ttsbtn{
     margin-top:12px; border:none; background:var(--sky-soft); color:var(--sky);
     padding:8px 16px; border-radius:99px; font-weight:800; font-size:.9rem; display:inline-flex; align-items:center; gap:6px;
@@ -139,7 +144,6 @@
   .ttsbtn:active{transform:scale(.95)}
 
   /* answer boxes (hint) */
-  .boxes{display:flex; justify-content:center; gap:8px; flex-wrap:wrap; min-height:4px}
   .box{
     width:52px; height:58px; border-radius:14px; display:grid; place-items:center;
     font-size:1.8rem; font-weight:800; border:2px dashed var(--line); color:var(--ink);
@@ -288,22 +292,19 @@
 
     <div class="card">
       <div class="prompt-block">
-        <div class="prompt-label">빈칸에 알맞은 낱말은?</div>
-        <div class="prompt-word"><span class="obj" id="prompt-obj"></span><span class="blank" id="prompt-blank">＿다</span></div>
+        <div class="prompt-label">빈칸에 알맞은 글자를 넣어요</div>
+        <div class="phrase" id="phrase"></div>
+        <div class="hint-note" id="hint-note"></div>
         <div>
           <button class="ttsbtn" id="btn-tts">🔊 읽어주기</button>
         </div>
       </div>
 
-      <!-- hint boxes (both modes show target shape) -->
-      <div class="boxes" id="boxes"></div>
-      <div class="hint-note" id="hint-note"></div>
-
       <!-- subjective input -->
       <div id="type-area" class="hidden">
         <div class="type-input-row">
           <input class="type-input" id="type-input" type="text" inputmode="text"
-                 autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="정답 입력 (다 생략 가능)">
+                 autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="빈칸 글자 입력">
         </div>
       </div>
 
@@ -348,8 +349,8 @@
       <div class="title">낱말 편집</div>
     </div>
     <p class="edit-help">
-      한 줄에 하나씩 <code>프롬프트, 정답</code> 형식으로 적어요. 예: <code>야채를, 볶다</code><br>
-      정답의 마지막 글자(보통 <b>다</b>)는 힌트에서 항상 보여집니다.
+      한 줄에 한 구절씩, 정답 글자를 대괄호 <code>[ ]</code>로 감싸요.<br>
+      예: <code>물고기 [낚]시</code> · <code>급식을 먹[었]다</code> · <code>[볶]음밥</code>
     </p>
     <textarea class="editor" id="editor" spellcheck="false"></textarea>
     <div class="edit-msg" id="edit-msg"></div>
@@ -364,20 +365,7 @@
 <script>
 "use strict";
 
-/* ================= 기본 낱말 (워크시트 기반, 편집 가능) ================= */
-const DEFAULT_WORDS = [
-  ["야채를","볶다"],   ["밤에 잠을","잤다"],  ["꿈을","꿨다"],
-  ["꽃을","꺾다"],     ["사과를","깎다"],     ["물고기를","낚다"],
-  ["끈을","묶다"],     ["안경을","닦다"],     ["가방을","쌌다"],
-  ["마늘을","깠다"],   ["아침에 잠을","깼다"], ["메달을","땄다"],
-  ["달이","떴다"],     ["글씨를","썼다"],     ["벨트를","맸다"],
-  ["제기를","찼다"],   ["불을","껐다"],       ["물감을","짰다"]
-].map(([prompt,answer])=>({prompt,answer}));
-
-const STORE_KEY = "nachmal.words.v1";
-const THEME_KEY = "nachmal.theme";
-
-/* ================= 한글 자모 분해/합성 ================= */
+/* CORE:START */  /* 순수 로직 — DOM/localStorage 미의존. test/logic.test.mjs가 추출·평가 */
 const CHO=['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
 const JUNG=['ㅏ','ㅐ','ㅑ','ㅒ','ㅓ','ㅔ','ㅕ','ㅖ','ㅗ','ㅘ','ㅙ','ㅚ','ㅛ','ㅜ','ㅝ','ㅞ','ㅟ','ㅠ','ㅡ','ㅢ','ㅣ'];
 const JONG=['','ㄱ','ㄲ','ㄳ','ㄴ','ㄵ','ㄶ','ㄷ','ㄹ','ㄺ','ㄻ','ㄼ','ㄽ','ㄾ','ㄿ','ㅀ','ㅁ','ㅂ','ㅄ','ㅅ','ㅆ','ㅇ','ㅈ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
@@ -392,26 +380,11 @@ function compose(choStr, jungStr, jongStr){
   if(ci<0 || ji<0) return choStr;
   return String.fromCharCode(0xAC00 + ci*588 + ji*28 + (ki<0?0:ki));
 }
-
-/**
- * 힌트 단계별로 각 글자의 표시 상태를 만든다.
- * 마지막 글자(보통 '다')는 항상 표시된다.
- *  level 0: 전부 빈칸
- *  level 1: 초성(자음)
- *  level 2: 초성+중성(모음)
- *  level 3+: 받침까지 = 완성
- */
-function buildBoxes(answer, level){
-  const chars = [...answer];
-  const last = chars.length - 1;
-  return chars.map((ch, i)=>{
-    const d = decompose(ch);
-    if(i === last || !d) return { text: ch, state:'fixed' };
-    if(level <= 0) return { text:'', state:'empty' };
-    if(level === 1) return { text: d.cho, state:'hint' };
-    if(level === 2) return { text: compose(d.cho, d.jung, ''), state:'hint' };
-    return { text: ch, state:'revealed' };
-  });
+function norm(s){ return (s||'').replace(/\s+/g,'').trim(); }
+function shuffle(a){
+  const arr = a.slice();
+  for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; }
+  return arr;
 }
 function hintLabel(level){
   if(level<=0) return "";
@@ -419,6 +392,92 @@ function hintLabel(level){
   if(level===2) return "힌트 2단계: <b>자음 + 모음</b>";
   return "힌트 3단계: <b>받침까지</b> 모두!";
 }
+function parseTemplate(str){
+  const s = (str||'').trim();
+  const m = s.match(/^([\s\S]*)\[([^\]]+)\]([\s\S]*)$/);
+  if(!m) return null;
+  const before = m[1], answer = m[2], after = m[3];
+  if(!answer) return null;
+  const beforeWord = before.split(/\s/).pop();   // 마지막 공백 뒤 조각
+  const afterWord  = after.split(/\s/)[0];        // 첫 공백 앞 조각
+  return { template:s, before, answer, after, word: beforeWord + answer + afterWord, full: before + answer + after };
+}
+const DEFAULT_TEMPLATES = [
+  // 기존 18개(동사) 변환
+  "야채를 [볶]다","밤에 잠을 [잤]다","꿈을 [꿨]다","꽃을 [꺾]다",
+  "사과를 [깎]다","물고기를 [낚]다","끈을 [묶]다","안경을 [닦]다",
+  "가방을 [쌌]다","마늘을 [깠]다","아침에 잠을 [깼]다","메달을 [땄]다",
+  "달이 [떴]다","글씨를 [썼]다","벨트를 [맸]다","제기를 [찼]다",
+  "불을 [껐]다","물감을 [짰]다",
+  // 신규 13개
+  "[밖]에 나간다","물고기 [낚]시","머리카락을 [묶]다","손톱 [깎]이",
+  "떡 [볶]이","[볶]음밥","연필 [깎]이","이를 [닦]다",
+  "리본을 [묶]다","급식을 먹[었]다","축구공을 [찼]다","학교에 [갔]다","물건을 [샀]다"
+];
+const DEFAULT_WORDS = DEFAULT_TEMPLATES.map(parseTemplate);
+function buildAnswerBoxes(answer, level){
+  return [...answer].map(ch=>{
+    const d = decompose(ch);
+    if(!d) return { text:ch, state:'fixed' };
+    if(level<=0) return { text:'', state:'empty' };
+    if(level===1) return { text:d.cho, state:'hint' };
+    if(level===2) return { text:compose(d.cho, d.jung, ''), state:'hint' };
+    return { text:ch, state:'revealed' };
+  });
+}
+function isCorrectTyped(val, w){
+  const v = norm(val);
+  if(!v) return false;
+  return v === norm(w.answer) || v === norm(w.word);
+}
+const CHO_CONF = {
+  'ㄱ':['ㄲ','ㅋ'],'ㄲ':['ㄱ','ㅋ'],'ㅋ':['ㄱ','ㄲ'],
+  'ㄷ':['ㄸ','ㅌ'],'ㄸ':['ㄷ','ㅌ'],'ㅌ':['ㄷ','ㄸ'],
+  'ㅂ':['ㅃ','ㅍ'],'ㅃ':['ㅂ','ㅍ'],'ㅍ':['ㅂ','ㅃ'],
+  'ㅅ':['ㅆ'],'ㅆ':['ㅅ'],
+  'ㅈ':['ㅉ','ㅊ'],'ㅉ':['ㅈ','ㅊ'],'ㅊ':['ㅈ','ㅉ']
+};
+const JUNG_CONF = {
+  'ㅐ':['ㅔ','ㅒ'],'ㅔ':['ㅐ','ㅖ'],'ㅒ':['ㅐ','ㅖ'],'ㅖ':['ㅔ','ㅒ'],
+  'ㅏ':['ㅑ','ㅓ'],'ㅑ':['ㅏ','ㅕ'],'ㅓ':['ㅕ','ㅗ'],'ㅕ':['ㅓ','ㅖ'],
+  'ㅗ':['ㅜ','ㅓ'],'ㅜ':['ㅗ','ㅠ'],'ㅛ':['ㅗ','ㅠ'],'ㅠ':['ㅜ','ㅛ'],
+  'ㅚ':['ㅙ','ㅞ'],'ㅙ':['ㅚ','ㅞ'],'ㅞ':['ㅚ','ㅙ'],'ㅘ':['ㅚ','ㅝ'],'ㅝ':['ㅘ','ㅞ'],
+  'ㅡ':['ㅜ','ㅗ'],'ㅣ':['ㅢ','ㅟ']
+};
+const JONG_CONF = {
+  'ㄲ':['ㄱ','','ㅆ'],'ㅆ':['ㅅ','','ㄲ'],
+  'ㄱ':['ㄲ',''],'ㅅ':['ㅆ','']
+};
+const GENERIC_JONG = ['ㄱ','ㄲ','ㅅ','ㅆ',''];
+
+function makeLetterDistractors(answerChar){
+  const d = decompose(answerChar);
+  if(!d) return shuffle(['가','나','다','라','마']).slice(0,3);
+  const g1 = (JONG_CONF[d.jong] || GENERIC_JONG).map(j => compose(d.cho, d.jung, j)); // 받침(우선)
+  const g2 = (CHO_CONF[d.cho] || []).map(c => compose(c, d.jung, d.jong));            // 초성
+  const g3 = (JUNG_CONF[d.jung] || []).map(v => compose(d.cho, v, d.jong));           // 중성
+  const ordered = [...shuffle(g1), ...shuffle(g2), ...shuffle(g3)];
+  const out = [];
+  const push = ch => { if(ch && ch !== answerChar && !out.includes(ch) && out.length < 3) out.push(ch); };
+  ordered.forEach(push);
+  // 부족분 보충: 목표 초/중성 + 일반 받침 → 그래도 부족하면 공통 글자
+  GENERIC_JONG.map(j => compose(d.cho, d.jung, j)).forEach(push);
+  ['가','나','다','라','마','바','사'].forEach(push);
+  return out.slice(0, 3);
+}
+function makeOptions(answer){
+  return shuffle([answer, ...makeLetterDistractors(answer)]);
+}
+function templateFromV1(prompt, answer){
+  const a = [...(answer||'')];
+  if(!a.length) return null;
+  return `${prompt} [${a[0]}]${a.slice(1).join('')}`;
+}
+/* CORE:END */
+
+const STORE_KEY_V1 = "nachmal.words.v1";
+const STORE_KEY_V2 = "nachmal.words.v2";
+const THEME_KEY = "nachmal.theme";
 
 /* ================= 상태 ================= */
 let WORDS = loadWords();
@@ -426,13 +485,31 @@ let state = null; // { mode, order, i, score, solvedFirstTry, hintLevel, done, o
 
 function loadWords(){
   try{
-    const raw = localStorage.getItem(STORE_KEY);
-    if(raw){ const arr = JSON.parse(raw); if(Array.isArray(arr) && arr.length) return arr; }
+    const raw = localStorage.getItem(STORE_KEY_V2);
+    if(raw){
+      const arr = JSON.parse(raw);
+      if(Array.isArray(arr) && arr.length){
+        const w = arr.map(parseTemplate).filter(Boolean);
+        if(w.length) return w;
+      }
+    }
+  }catch(e){}
+  try{
+    const rawV1 = localStorage.getItem(STORE_KEY_V1);   // v1 → v2 마이그레이션
+    if(rawV1){
+      const arr = JSON.parse(rawV1);
+      if(Array.isArray(arr) && arr.length){
+        const w = arr
+          .map(o => (o && o.prompt && o.answer) ? templateFromV1(o.prompt, o.answer) : null)
+          .filter(Boolean).map(parseTemplate).filter(Boolean);
+        if(w.length){ saveWords(w); return w; }
+      }
+    }
   }catch(e){}
   return DEFAULT_WORDS.slice();
 }
-function saveWords(arr){
-  try{ localStorage.setItem(STORE_KEY, JSON.stringify(arr)); }catch(e){}
+function saveWords(words){
+  try{ localStorage.setItem(STORE_KEY_V2, JSON.stringify(words.map(w=>w.template))); }catch(e){}
 }
 
 /* ================= DOM ================= */
@@ -496,23 +573,6 @@ if(window.matchMedia('(display-mode: fullscreen)').matches || window.matchMedia(
 }
 
 /* ================= 유틸 ================= */
-function shuffle(a){
-  const arr = a.slice();
-  for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; }
-  return arr;
-}
-function norm(s){ return (s||'').replace(/\s+/g,'').trim(); }
-
-// 주관식 정답 판정: 정답 전체(예 "볶다") 또는 마지막 "다"를 뺀 어간(예 "볶") 모두 인정
-function isCorrectTyped(val, answer){
-  const a = norm(answer);
-  if(val === a) return true;
-  if(a.length > 1 && a.endsWith('다')){
-    const stem = a.slice(0, -1);
-    if(stem && val === stem) return true;
-  }
-  return false;
-}
 
 function speak(text){
   if(!('speechSynthesis' in window)) return;
@@ -546,7 +606,6 @@ function startQuiz(mode){
 function currentWord(){ return WORDS[state.order[state.i]]; }
 
 function renderQuestion(){
-  const w = currentWord();
   state.hintLevel = 0;
   state.done = false;
   firstTryClean = true;
@@ -557,13 +616,12 @@ function renderQuestion(){
   $('pbar-fill').style.width = ((state.i)/state.order.length*100) + '%';
 
   // prompt
-  $('prompt-obj').textContent = w.prompt + ' ';
   $('feedback').textContent = ''; $('feedback').className = 'feedback';
   $('answer-reveal').textContent = '';
   $('hint-note').innerHTML = '';
 
   // boxes
-  drawBoxes();
+  renderPhrase();
 
   // buttons
   $('btn-next').classList.add('hidden');
@@ -583,29 +641,27 @@ function renderQuestion(){
   }
 }
 
-function drawBoxes(){
+function renderPhrase(){
   const w = currentWord();
-  const cells = buildBoxes(w.answer, state.hintLevel);
-  const wrap = $('boxes');
-  wrap.innerHTML = '';
+  const cells = buildAnswerBoxes(w.answer, state.hintLevel);
+  const p = $('phrase');
+  p.innerHTML = '';
+  if(w.before){ const s=document.createElement('span'); s.className='ctx'; s.textContent=w.before; p.appendChild(s); }
   cells.forEach(c=>{
-    const el = document.createElement('div');
+    const el = document.createElement('span');
     el.className = 'box ' + (c.state==='hint'?'hint':c.state==='revealed'?'revealed':c.state==='fixed'?'fixed':'');
     el.textContent = c.text;
-    wrap.appendChild(el);
+    p.appendChild(el);
   });
+  if(w.after){ const s=document.createElement('span'); s.className='ctx'; s.textContent=w.after; p.appendChild(s); }
   $('hint-note').innerHTML = hintLabel(state.hintLevel);
 }
 
 /* ---------- 객관식 ---------- */
 function renderOptions(){
   const w = currentWord();
-  const pool = shuffle(WORDS.filter(x=>x.answer!==w.answer).map(x=>x.answer));
-  const distract = [];
-  for(const a of pool){ if(distract.length>=3) break; if(!distract.includes(a)) distract.push(a); }
-  const opts = shuffle([w.answer, ...distract]);
+  const opts = makeOptions(w.answer);
   state.options = opts;
-
   const box = $('options');
   box.innerHTML = '';
   opts.forEach(ans=>{
@@ -629,8 +685,8 @@ function chooseOption(btn, ans){
     btn.classList.add('wrong');
     btn.disabled = true;
     state.hintLevel++;
-    drawBoxes();
-    $('boxes').classList.remove('shake'); void $('boxes').offsetWidth; $('boxes').classList.add('shake');
+    renderPhrase();
+    $('phrase').classList.remove('shake'); void $('phrase').offsetWidth; $('phrase').classList.add('shake');
     const remain = Array.from($('options').children).filter(b=>!b.disabled).length;
     setFeedback(false, remain>1 ? '아쉬워요! 오답 하나가 사라졌어요.' : '거의 다 왔어요!');
   }
@@ -642,17 +698,17 @@ function submitTyped(){
   const w = currentWord();
   const val = norm($('type-input').value);
   if(!val) { $('type-input').focus(); return; }
-  if(isCorrectTyped(val, w.answer)){
+  if(isCorrectTyped(val, w)){
     $('type-input').disabled = true;
-    $('boxes').classList.add('pop');
+    $('phrase').classList.add('pop');
     // 정답이면 전부 초록으로
-    state.hintLevel = 99; drawBoxes(); $('hint-note').innerHTML='';
+    state.hintLevel = 99; renderPhrase(); $('hint-note').innerHTML='';
     onCorrect();
   }else{
     firstTryClean = false;
     state.hintLevel++;
-    drawBoxes();
-    $('boxes').classList.remove('shake'); void $('boxes').offsetWidth; $('boxes').classList.add('shake');
+    renderPhrase();
+    $('phrase').classList.remove('shake'); void $('phrase').offsetWidth; $('phrase').classList.add('shake');
     setFeedback(false, '다시 한 번! 힌트가 늘어났어요.');
     $('type-input').select();
   }
@@ -665,7 +721,7 @@ function onCorrect(){
   if(firstTryClean){ state.score++; }
   $('score-val').textContent = state.score;
   setFeedback(true, firstTryClean ? '정답! ⭐ 한 번에 맞혔어요!' : '정답이에요! 잘했어요 👏');
-  $('answer-reveal').textContent = `${currentWord().prompt} ${currentWord().answer}`;
+  $('answer-reveal').textContent = currentWord().full;
   $('btn-submit').classList.add('hidden');
   $('btn-hint').classList.add('hidden');
   $('btn-skip').classList.add('hidden');
@@ -693,7 +749,7 @@ function useHint(){
   if(state.done) return;
   firstTryClean = false;
   state.hintLevel++;
-  drawBoxes();
+  renderPhrase();
   if(state.hintLevel>=3){ $('btn-hint').disabled = true; setFeedback(false,'마지막 힌트예요!'); }
 }
 
@@ -701,7 +757,7 @@ function skipQuestion(){
   if(state.done){ nextQuestion(); return; }
   firstTryClean = false;
   const w = currentWord();
-  state.hintLevel = 99; drawBoxes(); $('hint-note').innerHTML='';
+  state.hintLevel = 99; renderPhrase(); $('hint-note').innerHTML='';
   if(state.mode==='choice'){
     Array.from($('options').children).forEach(b=>{
       b.disabled = true;
@@ -713,7 +769,7 @@ function skipQuestion(){
   }
   state.done = true;
   setFeedback(false, `정답은 "${w.answer}" 였어요.`);
-  $('answer-reveal').textContent = `${w.prompt} ${w.answer}`;
+  $('answer-reveal').textContent = w.full;
   $('btn-hint').classList.add('hidden');
   $('btn-skip').classList.add('hidden');
   $('btn-next').classList.remove('hidden');
@@ -738,16 +794,15 @@ function showResult(){
 
 /* ================= 편집 ================= */
 function openEditor(){
-  $('editor').value = WORDS.map(w=>`${w.prompt}, ${w.answer}`).join('\n');
+  $('editor').value = WORDS.map(w=>w.template).join('\n');
   $('edit-msg').textContent=''; $('edit-msg').className='edit-msg';
   show('edit');
 }
 function parseEditor(text){
   const out=[];
   text.split('\n').forEach(line=>{
-    const t=line.trim(); if(!t) return;
-    const parts = t.split(/[,\t]/).map(s=>s.trim());
-    if(parts.length>=2 && parts[0] && parts[1]) out.push({prompt:parts[0], answer:parts[1]});
+    const w = parseTemplate(line);
+    if(w) out.push(w);
   });
   return out;
 }
@@ -755,17 +810,17 @@ function saveEditor(){
   const arr = parseEditor($('editor').value);
   const msg = $('edit-msg');
   if(arr.length < 2){
-    msg.textContent = '낱말을 2개 이상 입력해 주세요. (형식: 프롬프트, 정답)';
+    msg.textContent = '문제를 2개 이상 입력해 주세요. (형식: 정답 글자를 [ ]로 감싸기)';
     msg.className='edit-msg no'; return;
   }
   WORDS = arr; saveWords(arr);
-  msg.textContent = `저장했어요! (${arr.length}개 낱말)`;
+  msg.textContent = `저장했어요! (${arr.length}개 문제)`;
   msg.className='edit-msg ok';
   updateHomeCount();
 }
 function resetEditor(){
-  $('editor').value = DEFAULT_WORDS.map(w=>`${w.prompt}, ${w.answer}`).join('\n');
-  $('edit-msg').textContent = '기본 낱말로 되돌렸어요. "저장"을 눌러 적용하세요.';
+  $('editor').value = DEFAULT_TEMPLATES.join('\n');
+  $('edit-msg').textContent = '기본 문제로 되돌렸어요. "저장"을 눌러 적용하세요.';
   $('edit-msg').className='edit-msg ok';
 }
 
@@ -786,7 +841,7 @@ $('btn-hint').addEventListener('click', useHint);
 $('btn-skip').addEventListener('click', skipQuestion);
 $('btn-submit').addEventListener('click', submitTyped);
 $('type-input').addEventListener('keydown', e=>{ if(e.key==='Enter') submitTyped(); });
-$('btn-tts').addEventListener('click', ()=>{ const w=currentWord(); speak(w.prompt + ' 무엇을 했나요?'); });
+$('btn-tts').addEventListener('click', ()=>{ speak(currentWord().full); });
 $('btn-edit').addEventListener('click', openEditor);
 $('btn-edit-back').addEventListener('click', ()=>show('home'));
 $('btn-save').addEventListener('click', saveEditor);
