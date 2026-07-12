@@ -1,0 +1,736 @@
+<style>
+  :root{
+    --paper:#F3F7F4;
+    --card:#FFFFFF;
+    --ink:#233038;
+    --ink-soft:#5C6B72;
+    --line:#DEE7E2;
+    --green:#2FAE76;
+    --green-soft:#E4F5EC;
+    --coral:#FF6B5B;
+    --coral-soft:#FFEBE7;
+    --sky:#3E9BFF;
+    --sky-soft:#E7F1FF;
+    --gold:#F5A623;
+    --shadow:0 6px 20px rgba(35,48,56,.10);
+    --shadow-lg:0 14px 40px rgba(35,48,56,.16);
+    --radius:20px;
+    --radius-sm:14px;
+    --maxw:540px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#141B1E; --card:#1E282C; --ink:#EAF1ED; --ink-soft:#9FB0AC;
+      --line:#2C3A3E; --green:#3FC489; --green-soft:#1C332A; --coral:#FF7D6E;
+      --coral-soft:#3A2420; --sky:#6BB4FF; --sky-soft:#1B2C3E; --gold:#F7B94A;
+      --shadow:0 6px 20px rgba(0,0,0,.35); --shadow-lg:0 14px 40px rgba(0,0,0,.5);
+    }
+  }
+  :root[data-theme="light"]{
+    --paper:#F3F7F4; --card:#FFFFFF; --ink:#233038; --ink-soft:#5C6B72;
+    --line:#DEE7E2; --green:#2FAE76; --green-soft:#E4F5EC; --coral:#FF6B5B;
+    --coral-soft:#FFEBE7; --sky:#3E9BFF; --sky-soft:#E7F1FF; --gold:#F5A623;
+    --shadow:0 6px 20px rgba(35,48,56,.10); --shadow-lg:0 14px 40px rgba(35,48,56,.16);
+  }
+  :root[data-theme="dark"]{
+    --paper:#141B1E; --card:#1E282C; --ink:#EAF1ED; --ink-soft:#9FB0AC;
+    --line:#2C3A3E; --green:#3FC489; --green-soft:#1C332A; --coral:#FF7D6E;
+    --coral-soft:#3A2420; --sky:#6BB4FF; --sky-soft:#1B2C3E; --gold:#F7B94A;
+    --shadow:0 6px 20px rgba(0,0,0,.35); --shadow-lg:0 14px 40px rgba(0,0,0,.5);
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:"Apple SD Gothic Neo","Pretendard",system-ui,-apple-system,"Malgun Gothic",sans-serif;
+    background:var(--paper); color:var(--ink);
+    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+    min-height:100dvh;
+  }
+  .wrap{
+    max-width:var(--maxw); margin:0 auto;
+    padding:16px 18px calc(24px + env(safe-area-inset-bottom));
+    min-height:100dvh; display:flex; flex-direction:column;
+  }
+  button{font-family:inherit; cursor:pointer}
+  .hidden{display:none !important}
+
+  /* ---------- top bar ---------- */
+  .topbar{display:flex; align-items:center; gap:10px; margin-bottom:14px; min-height:40px}
+  .topbar .title{font-weight:800; font-size:1.05rem; letter-spacing:-.02em}
+  .topbar .spacer{flex:1}
+  .iconbtn{
+    border:none; background:var(--card); color:var(--ink); box-shadow:var(--shadow);
+    width:40px; height:40px; border-radius:12px; font-size:1.1rem; display:grid; place-items:center;
+    transition:transform .12s ease;
+  }
+  .iconbtn:active{transform:scale(.92)}
+
+  /* ---------- home ---------- */
+  .hero{text-align:center; padding:14px 6px 22px}
+  .hero .kicker{color:var(--green); font-weight:800; letter-spacing:.14em; font-size:.72rem; text-transform:uppercase}
+  .hero h1{margin:.35em 0 .15em; font-size:2rem; font-weight:900; letter-spacing:-.03em; text-wrap:balance; line-height:1.15}
+  .hero p{margin:0; color:var(--ink-soft); font-size:.98rem}
+
+  .modes{display:flex; flex-direction:column; gap:14px}
+  .mode-card{
+    text-align:left; border:none; border-radius:var(--radius); padding:20px 20px;
+    background:var(--card); box-shadow:var(--shadow); color:var(--ink);
+    display:flex; gap:16px; align-items:center; transition:transform .14s ease, box-shadow .14s ease;
+    border:2px solid transparent;
+  }
+  .mode-card:active{transform:translateY(2px) scale(.995)}
+  .mode-card:hover{box-shadow:var(--shadow-lg)}
+  .mode-card .emoji{
+    width:56px; height:56px; border-radius:16px; display:grid; place-items:center; font-size:1.7rem; flex:none;
+  }
+  .mode-card.choice .emoji{background:var(--sky-soft)}
+  .mode-card.type .emoji{background:var(--green-soft)}
+  .mode-card .mc-title{font-weight:800; font-size:1.18rem; letter-spacing:-.02em}
+  .mode-card .mc-desc{color:var(--ink-soft); font-size:.9rem; margin-top:3px; line-height:1.4}
+
+  .home-foot{margin-top:auto; padding-top:22px; text-align:center}
+  .ghostbtn{
+    border:1.5px solid var(--line); background:transparent; color:var(--ink-soft);
+    padding:11px 18px; border-radius:12px; font-size:.9rem; font-weight:700;
+  }
+  .ghostbtn:active{transform:scale(.97)}
+
+  /* ---------- quiz ---------- */
+  .progress-row{display:flex; align-items:center; gap:12px; margin-bottom:16px}
+  .pbar{flex:1; height:10px; background:var(--line); border-radius:99px; overflow:hidden}
+  .pbar > span{display:block; height:100%; background:var(--green); border-radius:99px; width:0%; transition:width .35s ease}
+  .pcount{font-size:.85rem; font-weight:800; color:var(--ink-soft); font-variant-numeric:tabular-nums}
+  .score-pill{
+    display:inline-flex; align-items:center; gap:5px; background:var(--card); box-shadow:var(--shadow);
+    padding:6px 11px; border-radius:99px; font-weight:800; font-size:.85rem; font-variant-numeric:tabular-nums;
+  }
+
+  .card{
+    background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow);
+    padding:24px 20px; display:flex; flex-direction:column; gap:18px;
+  }
+  .prompt-block{text-align:center}
+  .prompt-label{color:var(--ink-soft); font-size:.85rem; font-weight:700; margin-bottom:8px}
+  .prompt-word{
+    font-size:2.4rem; font-weight:900; letter-spacing:-.03em; line-height:1.1;
+    display:inline-flex; align-items:baseline; gap:.15em; flex-wrap:wrap; justify-content:center;
+  }
+  .prompt-word .obj{color:var(--ink)}
+  .prompt-word .blank{color:var(--sky)}
+  .ttsbtn{
+    margin-top:12px; border:none; background:var(--sky-soft); color:var(--sky);
+    padding:8px 16px; border-radius:99px; font-weight:800; font-size:.9rem; display:inline-flex; align-items:center; gap:6px;
+  }
+  .ttsbtn:active{transform:scale(.95)}
+
+  /* answer boxes (hint) */
+  .boxes{display:flex; justify-content:center; gap:8px; flex-wrap:wrap; min-height:4px}
+  .box{
+    width:52px; height:58px; border-radius:14px; display:grid; place-items:center;
+    font-size:1.8rem; font-weight:800; border:2px dashed var(--line); color:var(--ink);
+    background:transparent; transition:all .18s ease;
+  }
+  .box.hint{border-style:solid; border-color:var(--sky); color:var(--sky); background:var(--sky-soft)}
+  .box.revealed{border-style:solid; border-color:var(--green); color:var(--green); background:var(--green-soft)}
+  .box.fixed{border-style:solid; border-color:var(--line); color:var(--ink-soft); background:transparent}
+
+  .hint-note{
+    text-align:center; font-size:.82rem; color:var(--ink-soft); min-height:1.1em;
+  }
+  .hint-note b{color:var(--coral)}
+
+  /* subjective input */
+  .type-input-row{display:flex; gap:10px}
+  .type-input{
+    flex:1; border:2px solid var(--line); background:var(--paper); color:var(--ink);
+    border-radius:14px; padding:14px 16px; font-size:1.3rem; font-weight:700; text-align:center;
+    outline:none; transition:border-color .15s ease;
+  }
+  .type-input:focus{border-color:var(--sky)}
+  .type-input:disabled{opacity:.7}
+
+  /* options */
+  .options{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  .opt{
+    border:2px solid var(--line); background:var(--card); color:var(--ink);
+    border-radius:16px; padding:18px 10px; font-size:1.3rem; font-weight:800; letter-spacing:-.02em;
+    transition:transform .1s ease, background .15s ease, border-color .15s ease, opacity .2s ease;
+    min-height:64px;
+  }
+  .opt:active{transform:scale(.96)}
+  .opt.correct{background:var(--green-soft); border-color:var(--green); color:var(--green)}
+  .opt.wrong{background:var(--coral-soft); border-color:var(--coral); color:var(--coral); opacity:.55; text-decoration:line-through}
+  .opt:disabled{cursor:default}
+  .opt.removed{opacity:.32; text-decoration:line-through; pointer-events:none; filter:grayscale(.6)}
+
+  /* action buttons */
+  .actions{display:flex; gap:10px}
+  .btn{
+    flex:1; border:none; border-radius:16px; padding:16px; font-size:1.05rem; font-weight:800;
+    transition:transform .1s ease, filter .15s ease; min-height:56px;
+  }
+  .btn:active{transform:translateY(2px)}
+  .btn-primary{background:var(--green); color:#fff}
+  .btn-sky{background:var(--sky); color:#fff}
+  .btn-soft{background:var(--card); color:var(--ink-soft); box-shadow:var(--shadow)}
+  .btn:disabled{opacity:.4; pointer-events:none}
+
+  .feedback{text-align:center; font-weight:800; font-size:1.05rem; min-height:1.3em}
+  .feedback.ok{color:var(--green)}
+  .feedback.no{color:var(--coral)}
+
+  /* shake / pop */
+  @keyframes shake{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(4px)}30%,50%,70%{transform:translateX(-7px)}40%,60%{transform:translateX(7px)}}
+  .shake{animation:shake .5s cubic-bezier(.36,.07,.19,.97)}
+  @keyframes pop{0%{transform:scale(.9)}60%{transform:scale(1.06)}100%{transform:scale(1)}}
+  .pop{animation:pop .3s ease}
+  @media (prefers-reduced-motion: reduce){.shake,.pop{animation:none}}
+
+  /* ---------- results ---------- */
+  .result{text-align:center; padding:24px 12px}
+  .result .big{font-size:4rem; line-height:1}
+  .result h2{margin:.4em 0 .1em; font-size:1.6rem; font-weight:900}
+  .result .stat{color:var(--ink-soft); font-size:1.05rem}
+  .result .stat b{color:var(--green); font-size:1.3rem; font-variant-numeric:tabular-nums}
+
+  /* ---------- edit ---------- */
+  .edit-help{color:var(--ink-soft); font-size:.88rem; line-height:1.5; margin:0 0 12px}
+  .edit-help code{background:var(--card); padding:1px 6px; border-radius:6px; font-size:.85em}
+  textarea.editor{
+    width:100%; min-height:300px; border:2px solid var(--line); border-radius:14px; background:var(--card);
+    color:var(--ink); padding:14px; font-size:.95rem; line-height:1.6; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    outline:none; resize:vertical;
+  }
+  textarea.editor:focus{border-color:var(--sky)}
+  .edit-msg{font-size:.85rem; font-weight:700; min-height:1.2em; margin:8px 2px}
+  .edit-msg.ok{color:var(--green)} .edit-msg.no{color:var(--coral)}
+
+  .footer-tag{text-align:center; color:var(--ink-soft); font-size:.72rem; margin-top:18px; opacity:.7}
+
+  /* 큰 화면(갤럭시 폴드 펼침 등): 세로 중앙 정렬 + 여유 폭 */
+  @media (min-width:640px){
+    :root{ --maxw:600px; }
+    .wrap{ justify-content:center; padding-top:40px; padding-bottom:40px; }
+    .hero{padding-top:0}
+    .options{gap:14px}
+  }
+</style>
+
+
+<div class="wrap">
+
+  <!-- ============ HOME ============ -->
+  <section id="screen-home">
+    <div class="topbar">
+      <div class="title">📚 낱말 맞히기</div>
+      <div class="spacer"></div>
+      <button class="iconbtn" id="btn-theme" title="화면 밝기">🌗</button>
+    </div>
+
+    <div class="hero">
+      <div class="kicker">받침 있는 낱말</div>
+      <h1>어떤 낱말일까요?</h1>
+      <p>받침을 넣어 알맞은 낱말을 맞혀 보세요!</p>
+    </div>
+
+    <div class="modes">
+      <button class="mode-card choice" data-mode="choice">
+        <div class="emoji">✅</div>
+        <div>
+          <div class="mc-title">객관식 모드</div>
+          <div class="mc-desc">네 개의 보기 중에서 정답 고르기 · 틀리면 오답이 하나씩 사라져요</div>
+        </div>
+      </button>
+      <button class="mode-card type" data-mode="type">
+        <div class="emoji">✏️</div>
+        <div>
+          <div class="mc-title">주관식 모드</div>
+          <div class="mc-desc">보기 없이 직접 입력하기 · 틀릴 때마다 자음→모음→받침 힌트가 늘어나요</div>
+        </div>
+      </button>
+    </div>
+
+    <div class="home-foot">
+      <button class="ghostbtn" id="btn-edit">✎ 낱말 편집하기</button>
+    </div>
+    <div class="footer-tag" id="word-count-tag"></div>
+  </section>
+
+  <!-- ============ QUIZ ============ -->
+  <section id="screen-quiz" class="hidden">
+    <div class="topbar">
+      <button class="iconbtn" id="btn-home" title="홈으로">←</button>
+      <div class="title" id="mode-title"></div>
+      <div class="spacer"></div>
+      <div class="score-pill">⭐ <span id="score-val">0</span></div>
+    </div>
+
+    <div class="progress-row">
+      <div class="pbar"><span id="pbar-fill"></span></div>
+      <div class="pcount"><span id="q-idx">1</span>/<span id="q-total">0</span></div>
+    </div>
+
+    <div class="card">
+      <div class="prompt-block">
+        <div class="prompt-label">빈칸에 알맞은 낱말은?</div>
+        <div class="prompt-word"><span class="obj" id="prompt-obj"></span><span class="blank" id="prompt-blank">＿다</span></div>
+        <div>
+          <button class="ttsbtn" id="btn-tts">🔊 읽어주기</button>
+        </div>
+      </div>
+
+      <!-- hint boxes (both modes show target shape) -->
+      <div class="boxes" id="boxes"></div>
+      <div class="hint-note" id="hint-note"></div>
+
+      <!-- subjective input -->
+      <div id="type-area" class="hidden">
+        <div class="type-input-row">
+          <input class="type-input" id="type-input" type="text" inputmode="text"
+                 autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="정답 입력">
+        </div>
+      </div>
+
+      <!-- objective options -->
+      <div class="options hidden" id="options"></div>
+
+      <div class="feedback" id="feedback"></div>
+
+      <div class="actions">
+        <button class="btn btn-soft" id="btn-hint">💡 힌트</button>
+        <button class="btn btn-sky hidden" id="btn-submit">확인</button>
+        <button class="btn btn-primary hidden" id="btn-next">다음 →</button>
+        <button class="btn btn-soft" id="btn-skip">넘기기</button>
+      </div>
+    </div>
+    <div class="footer-tag" id="answer-reveal"></div>
+  </section>
+
+  <!-- ============ RESULTS ============ -->
+  <section id="screen-result" class="hidden">
+    <div class="topbar">
+      <button class="iconbtn" id="btn-home2" title="홈으로">←</button>
+      <div class="title">결과</div>
+    </div>
+    <div class="card">
+      <div class="result">
+        <div class="big" id="result-emoji">🎉</div>
+        <h2 id="result-title">참 잘했어요!</h2>
+        <div class="stat">한 번에 맞힌 낱말 <b id="result-score">0</b> / <span id="result-total">0</span></div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-soft" id="btn-result-home">홈으로</button>
+        <button class="btn btn-primary" id="btn-retry">다시 풀기</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ EDIT ============ -->
+  <section id="screen-edit" class="hidden">
+    <div class="topbar">
+      <button class="iconbtn" id="btn-edit-back" title="홈으로">←</button>
+      <div class="title">낱말 편집</div>
+    </div>
+    <p class="edit-help">
+      한 줄에 하나씩 <code>프롬프트, 정답</code> 형식으로 적어요. 예: <code>야채를, 볶다</code><br>
+      정답의 마지막 글자(보통 <b>다</b>)는 힌트에서 항상 보여집니다.
+    </p>
+    <textarea class="editor" id="editor" spellcheck="false"></textarea>
+    <div class="edit-msg" id="edit-msg"></div>
+    <div class="actions">
+      <button class="btn btn-soft" id="btn-reset">기본값 복원</button>
+      <button class="btn btn-primary" id="btn-save">저장</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+"use strict";
+
+/* ================= 기본 낱말 (워크시트 기반, 편집 가능) ================= */
+const DEFAULT_WORDS = [
+  ["야채를","볶다"],   ["밤에 잠을","잤다"],  ["꿈을","꿨다"],
+  ["꽃을","꺾다"],     ["사과를","깎다"],     ["물고기를","낚다"],
+  ["끈을","묶다"],     ["안경을","닦다"],     ["가방을","쌌다"],
+  ["마늘을","깠다"],   ["아침에 잠을","깼다"], ["메달을","땄다"],
+  ["달이","떴다"],     ["글씨를","썼다"],     ["벨트를","맸다"],
+  ["제기를","찼다"],   ["불을","껐다"],       ["물감을","짰다"]
+].map(([prompt,answer])=>({prompt,answer}));
+
+const STORE_KEY = "nachmal.words.v1";
+const THEME_KEY = "nachmal.theme";
+
+/* ================= 한글 자모 분해/합성 ================= */
+const CHO=['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+const JUNG=['ㅏ','ㅐ','ㅑ','ㅒ','ㅓ','ㅔ','ㅕ','ㅖ','ㅗ','ㅘ','ㅙ','ㅚ','ㅛ','ㅜ','ㅝ','ㅞ','ㅟ','ㅠ','ㅡ','ㅢ','ㅣ'];
+const JONG=['','ㄱ','ㄲ','ㄳ','ㄴ','ㄵ','ㄶ','ㄷ','ㄹ','ㄺ','ㄻ','ㄼ','ㄽ','ㄾ','ㄿ','ㅀ','ㅁ','ㅂ','ㅄ','ㅅ','ㅆ','ㅇ','ㅈ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+
+function decompose(ch){
+  const c = ch.charCodeAt(0) - 0xAC00;
+  if(c < 0 || c > 11171) return null;
+  return { cho:CHO[Math.floor(c/588)], jung:JUNG[Math.floor((c%588)/28)], jong:JONG[c%28] };
+}
+function compose(choStr, jungStr, jongStr){
+  const ci=CHO.indexOf(choStr), ji=JUNG.indexOf(jungStr), ki=JONG.indexOf(jongStr||'');
+  if(ci<0 || ji<0) return choStr;
+  return String.fromCharCode(0xAC00 + ci*588 + ji*28 + (ki<0?0:ki));
+}
+
+/**
+ * 힌트 단계별로 각 글자의 표시 상태를 만든다.
+ * 마지막 글자(보통 '다')는 항상 표시된다.
+ *  level 0: 전부 빈칸
+ *  level 1: 초성(자음)
+ *  level 2: 초성+중성(모음)
+ *  level 3+: 받침까지 = 완성
+ */
+function buildBoxes(answer, level){
+  const chars = [...answer];
+  const last = chars.length - 1;
+  return chars.map((ch, i)=>{
+    const d = decompose(ch);
+    if(i === last || !d) return { text: ch, state:'fixed' };
+    if(level <= 0) return { text:'', state:'empty' };
+    if(level === 1) return { text: d.cho, state:'hint' };
+    if(level === 2) return { text: compose(d.cho, d.jung, ''), state:'hint' };
+    return { text: ch, state:'revealed' };
+  });
+}
+function hintLabel(level){
+  if(level<=0) return "";
+  if(level===1) return "힌트 1단계: <b>자음(초성)</b>";
+  if(level===2) return "힌트 2단계: <b>자음 + 모음</b>";
+  return "힌트 3단계: <b>받침까지</b> 모두!";
+}
+
+/* ================= 상태 ================= */
+let WORDS = loadWords();
+let state = null; // { mode, order, i, score, solvedFirstTry, hintLevel, done, options }
+
+function loadWords(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(raw){ const arr = JSON.parse(raw); if(Array.isArray(arr) && arr.length) return arr; }
+  }catch(e){}
+  return DEFAULT_WORDS.slice();
+}
+function saveWords(arr){
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(arr)); }catch(e){}
+}
+
+/* ================= DOM ================= */
+const $ = id => document.getElementById(id);
+const screens = {
+  home:$('screen-home'), quiz:$('screen-quiz'), result:$('screen-result'), edit:$('screen-edit')
+};
+function show(name){
+  for(const k in screens) screens[k].classList.toggle('hidden', k!==name);
+  window.scrollTo(0,0);
+}
+
+/* ---------- theme ---------- */
+function initTheme(){
+  const saved = localStorage.getItem(THEME_KEY);
+  if(saved) document.documentElement.setAttribute('data-theme', saved);
+}
+$('btn-theme').addEventListener('click', ()=>{
+  const cur = document.documentElement.getAttribute('data-theme');
+  const isDark = cur ? cur==='dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const next = isDark ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem(THEME_KEY, next);
+});
+
+/* ================= 유틸 ================= */
+function shuffle(a){
+  const arr = a.slice();
+  for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; }
+  return arr;
+}
+function norm(s){ return (s||'').replace(/\s+/g,'').trim(); }
+
+function speak(text){
+  if(!('speechSynthesis' in window)) return;
+  try{
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'ko-KR'; u.rate = 0.9;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+
+/* ================= 퀴즈 시작 ================= */
+function startQuiz(mode){
+  state = {
+    mode,
+    order: shuffle(WORDS.map((_,i)=>i)),
+    i: 0,
+    score: 0,
+    hintLevel: 0,
+    done: false,
+    options: []
+  };
+  $('mode-title').textContent = mode==='choice' ? '객관식 모드' : '주관식 모드';
+  $('q-total').textContent = state.order.length;
+  $('type-area').classList.toggle('hidden', mode!=='type');
+  $('options').classList.toggle('hidden', mode!=='choice');
+  show('quiz');
+  renderQuestion();
+}
+
+function currentWord(){ return WORDS[state.order[state.i]]; }
+
+function renderQuestion(){
+  const w = currentWord();
+  state.hintLevel = 0;
+  state.done = false;
+  firstTryClean = true;
+
+  // progress
+  $('q-idx').textContent = state.i+1;
+  $('score-val').textContent = state.score;
+  $('pbar-fill').style.width = ((state.i)/state.order.length*100) + '%';
+
+  // prompt
+  $('prompt-obj').textContent = w.prompt + ' ';
+  $('feedback').textContent = ''; $('feedback').className = 'feedback';
+  $('answer-reveal').textContent = '';
+  $('hint-note').innerHTML = '';
+
+  // boxes
+  drawBoxes();
+
+  // buttons
+  $('btn-next').classList.add('hidden');
+  $('btn-hint').classList.remove('hidden');
+  $('btn-hint').disabled = false;
+  $('btn-skip').classList.remove('hidden');
+
+  if(state.mode==='type'){
+    $('btn-submit').classList.remove('hidden');
+    $('btn-submit').disabled = false;
+    const inp = $('type-input');
+    inp.value=''; inp.disabled=false;
+    setTimeout(()=>inp.focus(), 60);
+  }else{
+    $('btn-submit').classList.add('hidden');
+    renderOptions();
+  }
+}
+
+function drawBoxes(){
+  const w = currentWord();
+  const cells = buildBoxes(w.answer, state.hintLevel);
+  const wrap = $('boxes');
+  wrap.innerHTML = '';
+  cells.forEach(c=>{
+    const el = document.createElement('div');
+    el.className = 'box ' + (c.state==='hint'?'hint':c.state==='revealed'?'revealed':c.state==='fixed'?'fixed':'');
+    el.textContent = c.text;
+    wrap.appendChild(el);
+  });
+  $('hint-note').innerHTML = hintLabel(state.hintLevel);
+}
+
+/* ---------- 객관식 ---------- */
+function renderOptions(){
+  const w = currentWord();
+  const pool = shuffle(WORDS.filter(x=>x.answer!==w.answer).map(x=>x.answer));
+  const distract = [];
+  for(const a of pool){ if(distract.length>=3) break; if(!distract.includes(a)) distract.push(a); }
+  const opts = shuffle([w.answer, ...distract]);
+  state.options = opts;
+
+  const box = $('options');
+  box.innerHTML = '';
+  opts.forEach(ans=>{
+    const b = document.createElement('button');
+    b.className = 'opt'; b.textContent = ans; b.dataset.ans = ans;
+    b.addEventListener('click', ()=>chooseOption(b, ans));
+    box.appendChild(b);
+  });
+}
+
+function chooseOption(btn, ans){
+  if(state.done) return;
+  const w = currentWord();
+  if(ans === w.answer){
+    btn.classList.add('correct','pop');
+    Array.from($('options').children).forEach(b=>b.disabled=true);
+    onCorrect();
+  }else{
+    // 오답 하나 제거 + 힌트 단계 상승
+    firstTryClean = false;
+    btn.classList.add('wrong');
+    btn.disabled = true;
+    state.hintLevel++;
+    drawBoxes();
+    $('boxes').classList.remove('shake'); void $('boxes').offsetWidth; $('boxes').classList.add('shake');
+    const remain = Array.from($('options').children).filter(b=>!b.disabled).length;
+    setFeedback(false, remain>1 ? '아쉬워요! 오답 하나가 사라졌어요.' : '거의 다 왔어요!');
+  }
+}
+
+/* ---------- 주관식 ---------- */
+function submitTyped(){
+  if(state.done) return;
+  const w = currentWord();
+  const val = norm($('type-input').value);
+  if(!val) { $('type-input').focus(); return; }
+  if(val === norm(w.answer)){
+    $('type-input').disabled = true;
+    $('boxes').classList.add('pop');
+    // 정답이면 전부 초록으로
+    state.hintLevel = 99; drawBoxes(); $('hint-note').innerHTML='';
+    onCorrect();
+  }else{
+    firstTryClean = false;
+    state.hintLevel++;
+    drawBoxes();
+    $('boxes').classList.remove('shake'); void $('boxes').offsetWidth; $('boxes').classList.add('shake');
+    setFeedback(false, '다시 한 번! 힌트가 늘어났어요.');
+    $('type-input').select();
+  }
+}
+
+/* ---------- 공통 ---------- */
+function onCorrect(){
+  state.done = true;
+  // 힌트/오답 없이 첫 시도에 맞히면 +1점
+  if(firstTryClean){ state.score++; }
+  $('score-val').textContent = state.score;
+  setFeedback(true, firstTryClean ? '정답! ⭐ 한 번에 맞혔어요!' : '정답이에요! 잘했어요 👏');
+  $('answer-reveal').textContent = `${currentWord().prompt} ${currentWord().answer}`;
+  $('btn-submit').classList.add('hidden');
+  $('btn-hint').classList.add('hidden');
+  $('btn-skip').classList.add('hidden');
+  $('btn-next').classList.remove('hidden');
+  $('pbar-fill').style.width = ((state.i+1)/state.order.length*100) + '%';
+}
+
+// firstTryClean: 이번 문제에서 아직 틀리거나 힌트를 쓰지 않았는가
+let firstTryClean = true;
+
+function setFeedback(ok, msg){
+  const f = $('feedback');
+  f.textContent = msg;
+  f.className = 'feedback ' + (ok?'ok':'no');
+}
+
+function nextQuestion(){
+  state.i++;
+  if(state.i >= state.order.length){ showResult(); return; }
+  firstTryClean = true;
+  renderQuestion();
+}
+
+function useHint(){
+  if(state.done) return;
+  firstTryClean = false;
+  state.hintLevel++;
+  drawBoxes();
+  if(state.hintLevel>=3){ $('btn-hint').disabled = true; setFeedback(false,'마지막 힌트예요!'); }
+}
+
+function skipQuestion(){
+  if(state.done){ nextQuestion(); return; }
+  firstTryClean = false;
+  const w = currentWord();
+  state.hintLevel = 99; drawBoxes(); $('hint-note').innerHTML='';
+  if(state.mode==='choice'){
+    Array.from($('options').children).forEach(b=>{
+      b.disabled = true;
+      if(b.dataset.ans===w.answer) b.classList.add('correct');
+    });
+  }else{
+    $('type-input').value = w.answer; $('type-input').disabled = true;
+    $('btn-submit').classList.add('hidden');
+  }
+  state.done = true;
+  setFeedback(false, `정답은 "${w.answer}" 였어요.`);
+  $('answer-reveal').textContent = `${w.prompt} ${w.answer}`;
+  $('btn-hint').classList.add('hidden');
+  $('btn-skip').classList.add('hidden');
+  $('btn-next').classList.remove('hidden');
+}
+
+/* ================= 결과 ================= */
+function showResult(){
+  const total = state.order.length;
+  const score = state.score;
+  $('result-total').textContent = total;
+  $('result-score').textContent = score;
+  const ratio = score/total;
+  let emoji='🎉', title='참 잘했어요!';
+  if(ratio===1){ emoji='🏆'; title='완벽해요! 최고!'; }
+  else if(ratio>=0.7){ emoji='🎉'; title='아주 잘했어요!'; }
+  else if(ratio>=0.4){ emoji='😊'; title='좋아요! 조금 더!'; }
+  else { emoji='💪'; title='다시 도전해 볼까요?'; }
+  $('result-emoji').textContent = emoji;
+  $('result-title').textContent = title;
+  show('result');
+}
+
+/* ================= 편집 ================= */
+function openEditor(){
+  $('editor').value = WORDS.map(w=>`${w.prompt}, ${w.answer}`).join('\n');
+  $('edit-msg').textContent=''; $('edit-msg').className='edit-msg';
+  show('edit');
+}
+function parseEditor(text){
+  const out=[];
+  text.split('\n').forEach(line=>{
+    const t=line.trim(); if(!t) return;
+    const parts = t.split(/[,\t]/).map(s=>s.trim());
+    if(parts.length>=2 && parts[0] && parts[1]) out.push({prompt:parts[0], answer:parts[1]});
+  });
+  return out;
+}
+function saveEditor(){
+  const arr = parseEditor($('editor').value);
+  const msg = $('edit-msg');
+  if(arr.length < 2){
+    msg.textContent = '낱말을 2개 이상 입력해 주세요. (형식: 프롬프트, 정답)';
+    msg.className='edit-msg no'; return;
+  }
+  WORDS = arr; saveWords(arr);
+  msg.textContent = `저장했어요! (${arr.length}개 낱말)`;
+  msg.className='edit-msg ok';
+  updateHomeCount();
+}
+function resetEditor(){
+  $('editor').value = DEFAULT_WORDS.map(w=>`${w.prompt}, ${w.answer}`).join('\n');
+  $('edit-msg').textContent = '기본 낱말로 되돌렸어요. "저장"을 눌러 적용하세요.';
+  $('edit-msg').className='edit-msg ok';
+}
+
+function updateHomeCount(){
+  $('word-count-tag').textContent = `현재 ${WORDS.length}개의 낱말`;
+}
+
+/* ================= 이벤트 바인딩 ================= */
+document.querySelectorAll('.mode-card').forEach(c=>{
+  c.addEventListener('click', ()=>startQuiz(c.dataset.mode));
+});
+$('btn-home').addEventListener('click', ()=>show('home'));
+$('btn-home2').addEventListener('click', ()=>show('home'));
+$('btn-result-home').addEventListener('click', ()=>show('home'));
+$('btn-retry').addEventListener('click', ()=>startQuiz(state.mode));
+$('btn-next').addEventListener('click', nextQuestion);
+$('btn-hint').addEventListener('click', useHint);
+$('btn-skip').addEventListener('click', skipQuestion);
+$('btn-submit').addEventListener('click', submitTyped);
+$('type-input').addEventListener('keydown', e=>{ if(e.key==='Enter') submitTyped(); });
+$('btn-tts').addEventListener('click', ()=>{ const w=currentWord(); speak(w.prompt + ' 무엇을 했나요?'); });
+$('btn-edit').addEventListener('click', openEditor);
+$('btn-edit-back').addEventListener('click', ()=>show('home'));
+$('btn-save').addEventListener('click', saveEditor);
+$('btn-reset').addEventListener('click', resetEditor);
+
+/* ================= 시작 ================= */
+initTheme();
+updateHomeCount();
+show('home');
+</script>

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/epicurean/Library/Android/sdk/platforms/**)",
+      "Read(//Users/epicurean/Library/Android/sdk/build-tools/**)",
+      "Bash(java -version)",
+      "Bash(~/Library/Android/sdk/emulator/emulator -list-avds)"
+    ]
+  }
+}

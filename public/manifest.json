@@ -1,0 +1,30 @@
+{
+  "name": "받침 낱말 맞히기",
+  "short_name": "낱말맞히기",
+  "description": "받침 있는 낱말을 맞히는 학습 게임 (객관식·주관식)",
+  "start_url": "/index.html",
+  "scope": "/",
+  "display": "fullscreen",
+  "display_override": [
+    "fullscreen",
+    "standalone"
+  ],
+  "orientation": "portrait",
+  "background_color": "#F3F7F4",
+  "theme_color": "#2FAE76",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
