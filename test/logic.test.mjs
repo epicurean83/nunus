@@ -5,7 +5,8 @@ import { readFileSync } from 'node:fs';
 const CORE_NAMES = [
   'CHO','JUNG','JONG','decompose','compose','norm','shuffle','hintLabel',
   'parseTemplate','DEFAULT_TEMPLATES','DEFAULT_WORDS','buildAnswerBoxes',
-  'isCorrectTyped','makeLetterDistractors','makeOptions','templateFromV1','pickRound'
+  'isCorrectTyped','makeLetterDistractors','makeOptions','templateFromV1','pickRound',
+  'chainCheck','isHangulSyllable','SEED_WORDS'
 ];
 
 function loadCore(){
@@ -264,4 +265,59 @@ test('index.html: 홈 진도 표시 + 초기화', () => {
 test('index.html: 홈 진입 시 진도 갱신', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   assert.ok(html.includes("if(name==='home') updateHomeProgress()"));
+});
+
+test('chainCheck: 끝 글자로 시작하면 통과', () => {
+  const { chainCheck } = loadCore();
+  const r = chainCheck('사과', '과자', ['사과']);
+  assert.equal(r.ok, true);
+  assert.equal(r.need, '과');
+});
+test('chainCheck: 끝 글자 불일치는 start', () => {
+  const { chainCheck } = loadCore();
+  const r = chainCheck('사과', '나무', ['사과']);
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'start');
+  assert.equal(r.need, '과');
+});
+test('chainCheck: 이미 쓴 낱말은 reuse', () => {
+  const { chainCheck } = loadCore();
+  const r = chainCheck('모자', '자두', ['모자','자두']);
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'reuse');
+});
+test('chainCheck: 비한글은 notword, 빈값은 empty', () => {
+  const { chainCheck } = loadCore();
+  assert.equal(chainCheck('사과','apple',['사과']).reason, 'notword');
+  assert.equal(chainCheck('사과','12',['사과']).reason, 'notword');
+  assert.equal(chainCheck('사과','',['사과']).reason, 'empty');
+});
+test('chainCheck: 공백 무시', () => {
+  const { chainCheck } = loadCore();
+  assert.equal(chainCheck('사과',' 과 자 ',['사과']).ok, true);
+});
+test('SEED_WORDS: 모두 한글 음절, 길이>=2', () => {
+  const { SEED_WORDS, isHangulSyllable } = loadCore();
+  assert.ok(SEED_WORDS.length >= 10);
+  assert.ok(SEED_WORDS.every(w => [...w].length >= 2 && [...w].every(isHangulSyllable)));
+});
+test('chainCheck: 공백뿐인 이전 낱말이면 need는 빈 문자열', () => {
+  const { chainCheck } = loadCore();
+  const r = chainCheck('   ', '사과', []);
+  assert.equal(r.need, '');
+});
+test('chainCheck: 한 글자 낱말도 허용', () => {
+  const { chainCheck } = loadCore();
+  const r = chainCheck('사과', '과', ['사과']);   // 과 = single-syllable, starts with need '과'
+  assert.equal(r.ok, true);
+});
+test('index.html: 끝말잇기 화면/배선', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.ok(html.includes('id="screen-chain"'));
+  assert.ok(html.includes('data-mode="chain"'));
+  assert.ok(html.includes("chain:$('screen-chain')"));
+  assert.ok(html.includes('function startChain'));
+  assert.ok(html.includes('function submitChain'));
+  assert.ok(html.includes("if(m==='chain') startChain()"));
+  assert.ok(html.includes('nachmal.chain.best.v1'));
 });

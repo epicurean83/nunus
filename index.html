@@ -227,6 +227,17 @@
 
   .footer-tag{text-align:center; color:var(--ink-soft); font-size:.72rem; margin-top:18px; opacity:.7}
 
+  /* ---------- 끝말잇기 ---------- */
+  .mode-card.chain .emoji{background:var(--coral-soft)}
+  .chain-flow{display:flex; flex-wrap:wrap; gap:6px 4px; align-items:center; font-size:1.4rem; font-weight:800; line-height:1.5; min-height:2em}
+  .chain-flow .cw{color:var(--ink-soft)}
+  .chain-flow .cw.last{color:var(--green)}
+  .chain-flow .arr{color:var(--line); font-weight:700}
+  .chain-need{text-align:center; font-size:1.1rem; font-weight:800; color:var(--ink); margin:8px 0 2px; min-height:1.4em}
+  .chain-endbox{text-align:center; padding:8px 0}
+  .chain-endbox .big{font-size:1.9rem; font-weight:900; margin-bottom:4px}
+  #chain-record{color:var(--gold); font-weight:800; margin-bottom:6px}
+
   /* 큰 화면(갤럭시 폴드 펼침 등): 세로 중앙 정렬 + 여유 폭 */
   @media (min-width:640px){
     :root{ --maxw:600px; }
@@ -269,6 +280,13 @@
           <div class="mc-title">주관식 모드</div>
           <div class="mc-desc">보기 없이 직접 입력하기 · 틀릴 때마다 자음→모음→받침 힌트가 늘어나요</div>
           <div class="mc-progress" id="prog-type"></div>
+        </div>
+      </button>
+      <button class="mode-card chain" data-mode="chain">
+        <div class="emoji">🔤</div>
+        <div>
+          <div class="mc-title">끝말잇기</div>
+          <div class="mc-desc">낱말의 끝 글자로 새 낱말 잇기 · 최대한 길게 이어 보세요</div>
         </div>
       </button>
     </div>
@@ -362,6 +380,40 @@
     <div class="actions">
       <button class="btn btn-soft" id="btn-reset">기본값 복원</button>
       <button class="btn btn-primary" id="btn-save">저장</button>
+    </div>
+  </section>
+
+  <!-- ============ WORD CHAIN ============ -->
+  <section id="screen-chain" class="hidden">
+    <div class="topbar">
+      <button class="iconbtn" id="btn-chain-home" title="홈으로">←</button>
+      <div class="title">🔤 끝말잇기</div>
+      <div class="spacer"></div>
+      <div class="score-pill">🔗 <span id="chain-count">0</span> · 최고 <span id="chain-best">0</span></div>
+    </div>
+    <div class="card">
+      <div class="chain-flow" id="chain-flow"></div>
+      <div class="chain-need" id="chain-need"></div>
+      <div id="chain-play">
+        <div class="type-input-row">
+          <input class="type-input" id="chain-input" type="text" inputmode="text"
+                 autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="낱말 입력">
+          <button class="btn btn-sky" id="chain-submit" style="flex:none; min-height:auto; padding:0 20px">확인</button>
+        </div>
+        <div class="feedback" id="chain-feedback"></div>
+        <div class="actions">
+          <button class="btn btn-soft" id="chain-reroll">🔄 다른 낱말</button>
+          <button class="btn btn-primary" id="chain-end">끝내기</button>
+        </div>
+      </div>
+      <div id="chain-endbox" class="chain-endbox hidden">
+        <div class="big" id="chain-endtext"></div>
+        <div id="chain-record" class="hidden">🏆 최고 기록!</div>
+        <div class="actions">
+          <button class="btn btn-soft" id="chain-home2">홈으로</button>
+          <button class="btn btn-primary" id="chain-restart">다시 시작</button>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -494,6 +546,19 @@ function pickRound(allTemplates, playedTemplates, size){
   }
   return { round: shuffle(round), played: Array.from(playedSet), reset };
 }
+function isHangulSyllable(ch){ const c = ch.charCodeAt(0); return c >= 0xAC00 && c <= 0xD7A3; }
+const SEED_WORDS = ["사과","기차","나무","우산","가방","모자","우유","오이","다리","포도","하마","노래","두부","소라","비누"];
+function chainCheck(prevWord, input, usedWords){
+  const v = norm(input);
+  const np = norm(prevWord);
+  const need = np ? [...np].pop() : '';
+  if(!v) return { ok:false, reason:'empty', need };
+  const chars = [...v];
+  if(!chars.every(isHangulSyllable)) return { ok:false, reason:'notword', need };
+  if(chars[0] !== need) return { ok:false, reason:'start', need };
+  if(usedWords.some(w => norm(w) === v)) return { ok:false, reason:'reuse', need };
+  return { ok:true, reason:'ok', need };
+}
 /* CORE:END */
 
 const STORE_KEY_V1 = "nachmal.words.v1";
@@ -548,7 +613,7 @@ function totalProblems(){ return new Set(WORDS.map(w=>w.template)).size; }
 /* ================= DOM ================= */
 const $ = id => document.getElementById(id);
 const screens = {
-  home:$('screen-home'), quiz:$('screen-quiz'), result:$('screen-result'), edit:$('screen-edit')
+  home:$('screen-home'), quiz:$('screen-quiz'), result:$('screen-result'), edit:$('screen-edit'), chain:$('screen-chain')
 };
 function show(name){
   for(const k in screens) screens[k].classList.toggle('hidden', k!==name);
@@ -882,9 +947,69 @@ function updateHomeProgress(){
   });
 }
 
+/* ================= 끝말잇기 ================= */
+const BEST_KEY = "nachmal.chain.best.v1";
+function loadBest(){ try{ const n = parseInt(localStorage.getItem(BEST_KEY),10); return Number.isFinite(n) && n>0 ? n : 0; }catch(e){ return 0; } }
+function saveBest(n){ try{ localStorage.setItem(BEST_KEY, String(n)); }catch(e){} }
+let chainWords = [];
+let chainBest = loadBest();
+
+function renderChain(){
+  const flow = $('chain-flow'); flow.innerHTML = '';
+  chainWords.forEach((w,i)=>{
+    if(i>0){ const a=document.createElement('span'); a.className='arr'; a.textContent='→'; flow.appendChild(a); }
+    const s=document.createElement('span'); s.className='cw'+(i===chainWords.length-1?' last':''); s.textContent=w; flow.appendChild(s);
+  });
+  const need = chainWords.length ? [...chainWords[chainWords.length-1]].pop() : '';
+  $('chain-need').textContent = need ? `다음은 ‘${need}’로 시작!` : '';
+  $('chain-count').textContent = chainWords.length;
+  $('chain-best').textContent = chainBest;
+}
+function chainFeedback(ok, msg){ const f=$('chain-feedback'); f.textContent=msg; f.className='feedback '+(ok?'ok':'no'); }
+function startChain(){
+  finalizeBest();
+  chainWords = [ shuffle(SEED_WORDS)[0] ];
+  $('chain-endbox').classList.add('hidden');
+  $('chain-play').classList.remove('hidden');
+  $('chain-record').classList.add('hidden');
+  $('chain-feedback').textContent=''; $('chain-feedback').className='feedback';
+  $('chain-input').value='';
+  renderChain();
+  show('chain');
+  setTimeout(()=>$('chain-input').focus(), 60);
+}
+function submitChain(){
+  const val = $('chain-input').value;
+  if(!norm(val)){ $('chain-input').focus(); return; }
+  const prev = chainWords[chainWords.length-1];
+  const res = chainCheck(prev, val, chainWords);
+  if(res.ok){
+    chainWords.push(norm(val));
+    $('chain-input').value='';
+    renderChain();
+    chainFeedback(true, '좋아요! 이어졌어요 👏');
+  }else{
+    let msg = '한글 낱말을 입력해요';
+    if(res.reason==='start') msg = `‘${res.need}’로 시작하는 낱말이에요!`;
+    else if(res.reason==='reuse') msg = '이미 쓴 낱말이에요';
+    chainFeedback(false, msg);
+    $('chain-input').select();
+  }
+}
+function finalizeBest(){ if(chainWords.length > chainBest){ chainBest = chainWords.length; saveBest(chainBest); return true; } return false; }
+function endChain(){
+  const rec = finalizeBest();
+  $('chain-play').classList.add('hidden');
+  $('chain-endbox').classList.remove('hidden');
+  $('chain-endtext').textContent = `🔗 ${chainWords.length}개 이어봤어요!`;
+  $('chain-record').classList.toggle('hidden', !rec);
+  $('chain-best').textContent = chainBest;
+}
+function leaveChain(){ finalizeBest(); show('home'); }
+
 /* ================= 이벤트 바인딩 ================= */
 document.querySelectorAll('.mode-card').forEach(c=>{
-  c.addEventListener('click', ()=>startQuiz(c.dataset.mode));
+  c.addEventListener('click', ()=>{ const m=c.dataset.mode; if(m==='chain') startChain(); else startQuiz(m); });
 });
 $('btn-home').addEventListener('click', ()=>show('home'));
 $('btn-home2').addEventListener('click', ()=>show('home'));
@@ -905,6 +1030,13 @@ $('btn-reset-progress').addEventListener('click', ()=>{
     PROGRESS = { choice: [], type: [] }; saveProgress(); updateHomeProgress();
   }
 });
+$('chain-submit').addEventListener('click', submitChain);
+$('chain-input').addEventListener('keydown', e=>{ if(e.key==='Enter') submitChain(); });
+$('chain-reroll').addEventListener('click', startChain);
+$('chain-end').addEventListener('click', endChain);
+$('chain-restart').addEventListener('click', startChain);
+$('btn-chain-home').addEventListener('click', leaveChain);
+$('chain-home2').addEventListener('click', leaveChain);
 
 /* ================= 시작 ================= */
 initTheme();
