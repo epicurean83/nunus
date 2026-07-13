@@ -300,6 +300,7 @@
     <div class="home-foot">
       <button class="ghostbtn" id="btn-edit">✎ 낱말 편집하기</button>
       <button class="ghostbtn" id="btn-reset-progress">↺ 진도 초기화</button>
+      <button class="ghostbtn" id="btn-reset-chain">↺ 끝말잇기 기록 초기화</button>
     </div>
     <div class="footer-tag" id="word-count-tag"></div>
   </section>
@@ -1061,6 +1062,14 @@ $('btn-reset').addEventListener('click', resetEditor);
 $('btn-reset-progress').addEventListener('click', ()=>{
   if(confirm('객관식·주관식 진도를 모두 초기화할까요?')){
     PROGRESS = { choice: [], type: [] }; saveProgress(); updateHomeProgress();
+  }
+});
+$('btn-reset-chain').addEventListener('click', ()=>{
+  if(confirm('끝말잇기 최고 기록을 초기화할까요?')){
+    chainBest = 0; chainBestWords = []; chainWords = [];  // 남아있는 체인이 기록을 되살리지 않도록
+    try{ localStorage.removeItem(BEST_KEY); localStorage.removeItem(BESTWORDS_KEY); }catch(e){}
+    const btn = $('btn-reset-chain'); btn.textContent = '✓ 초기화됐어요';
+    setTimeout(()=>{ btn.textContent = '↺ 끝말잇기 기록 초기화'; }, 1500);
   }
 });
 $('chain-submit').addEventListener('click', submitChain);

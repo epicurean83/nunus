@@ -329,3 +329,9 @@ test('index.html: 최고 기록 체인 보기', () => {
   assert.ok(html.includes('function openRecord'));
   assert.ok(html.includes('function renderWords'));
 });
+test('index.html: 끝말잇기 기록 초기화 버튼', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.ok(html.includes('id="btn-reset-chain"'));
+  assert.ok(html.includes('끝말잇기 최고 기록을 초기화'));
+  assert.ok(html.includes('removeItem(BEST_KEY)'));
+});
