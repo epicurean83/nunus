@@ -350,7 +350,7 @@ test('chainCheck: 사전 미지정이면 규칙만(기존 동작 유지)', () =>
 });
 test('WORD_DICT: 모두 한글 음절, 중복 없음, 시드 포함', () => {
   const { WORD_DICT, SEED_WORDS, isHangulSyllable } = loadCore();
-  assert.ok(WORD_DICT.length >= 800);
+  assert.ok(WORD_DICT.length >= 3000);
   assert.equal(new Set(WORD_DICT).size, WORD_DICT.length);
   assert.ok(WORD_DICT.every(w => [...w].length >= 1 && [...w].every(isHangulSyllable)));
   assert.ok(SEED_WORDS.every(s => WORD_DICT.includes(s)));
