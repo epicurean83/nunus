@@ -6,7 +6,7 @@ const CORE_NAMES = [
   'CHO','JUNG','JONG','decompose','compose','norm','shuffle','hintLabel',
   'parseTemplate','DEFAULT_TEMPLATES','DEFAULT_WORDS','buildAnswerBoxes',
   'isCorrectTyped','makeLetterDistractors','makeOptions','templateFromV1','pickRound',
-  'chainCheck','isHangulSyllable','SEED_WORDS'
+  'chainCheck','WORD_DICT','isHangulSyllable','SEED_WORDS'
 ];
 
 function loadCore(){
@@ -334,4 +334,30 @@ test('index.html: 끝말잇기 기록 초기화 버튼', () => {
   assert.ok(html.includes('id="btn-reset-chain"'));
   assert.ok(html.includes('끝말잇기 최고 기록을 초기화'));
   assert.ok(html.includes('removeItem(BEST_KEY)'));
+});
+test('chainCheck: 사전 켜짐이면 사전에 있는 낱말만 통과', () => {
+  const { chainCheck } = loadCore();
+  const dict = new Set(['사과','과자']);
+  assert.equal(chainCheck('사과','과자',['사과'], dict).ok, true);
+  const r = chainCheck('사과','과일',['사과'], dict);   // 과일은 이 작은 사전에 없음
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'notindict');
+});
+test('chainCheck: 사전 미지정이면 규칙만(기존 동작 유지)', () => {
+  const { chainCheck } = loadCore();
+  assert.equal(chainCheck('사과','과일',['사과']).ok, true);   // dict 없음 → 규칙만
+});
+test('WORD_DICT: 모두 한글 음절, 중복 없음, 시드 포함', () => {
+  const { WORD_DICT, SEED_WORDS, isHangulSyllable } = loadCore();
+  assert.ok(WORD_DICT.length >= 800);
+  assert.equal(new Set(WORD_DICT).size, WORD_DICT.length);
+  assert.ok(WORD_DICT.every(w => [...w].length >= 1 && [...w].every(isHangulSyllable)));
+  assert.ok(SEED_WORDS.every(s => WORD_DICT.includes(s)));
+});
+test('index.html: 사전 검사 토글 배선', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.ok(html.includes('id="chain-dict-toggle"'));
+  assert.ok(html.includes('nachmal.chain.dict.v1'));
+  assert.ok(html.includes('chainUseDict ? WORD_SET : null'));
+  assert.ok(html.includes("res.reason==='notindict'"));
 });
