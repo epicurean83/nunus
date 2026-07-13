@@ -6,7 +6,8 @@ const CORE_NAMES = [
   'CHO','JUNG','JONG','decompose','compose','norm','shuffle','hintLabel',
   'parseTemplate','DEFAULT_TEMPLATES','DEFAULT_WORDS','buildAnswerBoxes',
   'isCorrectTyped','makeLetterDistractors','makeOptions','templateFromV1','pickRound',
-  'chainCheck','WORD_DICT','isHangulSyllable','SEED_WORDS'
+  'chainCheck','WORD_DICT','isHangulSyllable','SEED_WORDS',
+  'hintStages','hintDisplay','hasContinuation','findHint'
 ];
 
 function loadCore(){
@@ -354,10 +355,35 @@ test('WORD_DICT: 모두 한글 음절, 중복 없음, 시드 포함', () => {
   assert.ok(WORD_DICT.every(w => [...w].length >= 1 && [...w].every(isHangulSyllable)));
   assert.ok(SEED_WORDS.every(s => WORD_DICT.includes(s)));
 });
-test('index.html: 사전 검사 토글 배선', () => {
+test('hintStages/hintDisplay: 자음→모음→받침 순 공개', () => {
+  const { hintStages, hintDisplay } = loadCore();
+  assert.equal(hintStages('사자').length, 4);           // 사(ㅅ,사) 자(ㅈ,자)
+  assert.equal(hintDisplay('사자', 0), '__');
+  assert.equal(hintDisplay('사자', 1), 'ㅅ_');
+  assert.equal(hintDisplay('사자', 2), '사_');
+  assert.equal(hintDisplay('사자', 3), '사ㅈ');
+  assert.equal(hintDisplay('사자', 4), '사자');
+  assert.equal(hintStages('사슴').length, 5);           // 슴에 받침 ㅁ → 3단계
+  assert.equal(hintDisplay('사슴', 5), '사슴');
+});
+test('hasContinuation / findHint: 이어갈 사전 낱말 판정', () => {
+  const { hasContinuation, findHint } = loadCore();
+  const words = ['사과','과자','바나나'];
+  assert.equal(hasContinuation('과', words, ['사과']), true);    // 과자
+  assert.equal(hasContinuation('과', words, ['사과','과자']), false); // 과자 이미 씀
+  assert.equal(hasContinuation('나', words, []), false);         // '나'로 시작하는 낱말 없음
+  const h = findHint('과', words, ['사과']);
+  assert.equal(h, '과자');
+  assert.equal(findHint('과', words, ['사과','과자']), null);
+});
+test('index.html: 대화형 UI 배선(토글 제거)', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-  assert.ok(html.includes('id="chain-dict-toggle"'));
-  assert.ok(html.includes('nachmal.chain.dict.v1'));
-  assert.ok(html.includes('chainUseDict ? WORD_SET : null'));
-  assert.ok(html.includes("res.reason==='notindict'"));
+  assert.ok(html.includes('id="chain-bubble"'));
+  assert.ok(html.includes('id="register-ask"'));
+  assert.ok(html.includes('id="chain-hint-btn"'));
+  assert.ok(html.includes('id="chain-end-x"'));
+  assert.ok(html.includes('nachmal.chain.userwords.v1'));
+  assert.ok(html.includes('function confirmRegister'));
+  assert.ok(!html.includes('id="chain-dict-toggle"'));   // 토글 제거됨
+  assert.ok(!html.includes('id="chain-reroll"'));        // 다른 낱말 제거됨
 });

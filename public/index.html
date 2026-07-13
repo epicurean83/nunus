@@ -237,10 +237,20 @@
   .chain-endbox{text-align:center; padding:8px 0}
   .chain-endbox .big{font-size:1.9rem; font-weight:900; margin-bottom:4px}
   #chain-record{color:var(--gold); font-weight:800; margin-bottom:6px}
-  .dict-toggle-row{text-align:center; margin-bottom:10px}
-  .dict-toggle{border:1.5px solid var(--line); background:transparent; color:var(--ink-soft); border-radius:99px; padding:5px 14px; font-size:.82rem; font-weight:800; cursor:pointer; font-family:inherit}
-  .dict-toggle.on{border-color:var(--green); color:var(--green); background:var(--green-soft)}
-  .dict-toggle:active{transform:scale(.95)}
+  /* 도우미 말풍선 */
+  .assistant{display:flex; align-items:flex-start; gap:10px; margin-bottom:14px}
+  .mascot{font-size:2.1rem; line-height:1.2; flex:none}
+  .bubble{
+    flex:1; min-height:1.4em; background:var(--sky-soft); color:var(--ink);
+    border-radius:16px; border-top-left-radius:4px; padding:12px 15px;
+    font-size:1.02rem; font-weight:800; line-height:1.45; transition:background .15s ease;
+  }
+  .bubble.ok{background:var(--green-soft); color:var(--green)}
+  .bubble.no{background:var(--coral-soft); color:var(--coral)}
+  .bubble.think{background:var(--sky-soft); color:var(--sky)}
+  .register-ask{display:flex; gap:10px; margin-bottom:14px}
+  .register-ask .btn{flex:1; min-height:52px; font-size:1rem}
+  .chain-hint{text-align:center; font-size:1.35rem; font-weight:800; color:var(--sky); letter-spacing:.12em; min-height:1.4em; margin:2px 0}
   button.score-pill{border:none; cursor:pointer; color:var(--ink); font-family:inherit}
   button.score-pill:active{transform:scale(.94)}
   .overlay{position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; padding:24px; z-index:50}
@@ -401,21 +411,28 @@
       <div class="title">🔤 끝말잇기</div>
       <div class="spacer"></div>
       <button class="score-pill" id="chain-record-btn" title="최고 기록 보기">🔗 <span id="chain-count">0</span> · 최고 <span id="chain-best">0</span> 👀</button>
+      <button class="iconbtn" id="chain-end-x" title="끝내기">✕</button>
     </div>
     <div class="card">
-      <div class="chain-flow" id="chain-flow"></div>
-      <div class="chain-need" id="chain-need"></div>
+      <div class="assistant">
+        <div class="mascot">🦉</div>
+        <div class="bubble" id="chain-bubble"></div>
+      </div>
+      <div class="register-ask hidden" id="register-ask">
+        <button class="btn btn-primary" id="register-yes">어 등록해줘</button>
+        <button class="btn btn-soft" id="register-no">아니야</button>
+      </div>
       <div id="chain-play">
-        <div class="dict-toggle-row"><button class="dict-toggle" id="chain-dict-toggle"></button></div>
+        <div class="chain-flow" id="chain-flow"></div>
+        <div class="chain-need" id="chain-need"></div>
         <div class="type-input-row">
           <input class="type-input" id="chain-input" type="text" inputmode="text"
                  autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="낱말 입력">
           <button class="btn btn-sky" id="chain-submit" style="flex:none; min-height:auto; padding:0 20px">확인</button>
         </div>
-        <div class="feedback" id="chain-feedback"></div>
+        <div class="chain-hint" id="chain-hint"></div>
         <div class="actions">
-          <button class="btn btn-soft" id="chain-reroll">🔄 다른 낱말</button>
-          <button class="btn btn-primary" id="chain-end">끝내기</button>
+          <button class="btn btn-soft" id="chain-hint-btn">💡 힌트</button>
         </div>
       </div>
       <div id="chain-endbox" class="chain-endbox hidden">
@@ -580,6 +597,34 @@ function chainCheck(prevWord, input, usedWords, dict){
   if(usedWords.some(w => norm(w) === v)) return { ok:false, reason:'reuse', need };
   if(dict && !dict.has(v)) return { ok:false, reason:'notindict', need };
   return { ok:true, reason:'ok', need };
+}
+// 힌트: 낱말을 자음→모음→(받침) 순 단계로 분해
+function hintStages(word){
+  const out = [];
+  [...word].forEach((ch,i)=>{
+    const d = decompose(ch);
+    if(!d){ out.push({ i, val:ch }); return; }
+    out.push({ i, val:d.cho });
+    out.push({ i, val:compose(d.cho, d.jung, '') });
+    if(d.jong) out.push({ i, val:ch });
+  });
+  return out;
+}
+function hintDisplay(word, step){
+  const stages = hintStages(word);
+  const byChar = {};
+  stages.slice(0, step).forEach(s=>{ byChar[s.i] = s.val; });
+  return [...word].map((ch,i)=> byChar[i] !== undefined ? byChar[i] : '_').join('');
+}
+// 이어갈 사전 낱말이 있는지 / 하나 고르기 (need로 시작, 사용 안 함)
+function hasContinuation(need, words, used){
+  const u = new Set((used||[]).map(w=>norm(w)));
+  return words.some(w=>{ const v=norm(w); return v && [...v][0]===need && !u.has(v); });
+}
+function findHint(need, words, used){
+  const u = new Set((used||[]).map(w=>norm(w)));
+  const cands = words.filter(w=>{ const v=norm(w); return v && [...v][0]===need && !u.has(v); });
+  return cands.length ? shuffle(cands)[0] : null;
 }
 const WORD_DICT = ["사자","호랑이","코끼리","기린","원숭이","곰","여우","늑대","토끼","사슴","노루","멧돼지","돼지","소","말","양","염소","개","강아지","고양이","쥐","다람쥐","너구리","두더지","캥거루","코알라","판다","하마","물소","얼룩말","표범","치타","낙타","고릴라","침팬지","나무늘보","고슴도치","박쥐","두꺼비","개구리","도마뱀","카멜레온","악어","거북","거북이","뱀","이구아나","코뿔소","비버","수달","족제비","오소리","살쾡이","들소","순록","당나귀","조랑말","망아지","송아지","염통","호저","참새","비둘기","까치","까마귀","제비","독수리","매","부엉이","올빼미","학","두루미","백조","오리","거위","닭","병아리","공작","앵무새","펭귄","타조","갈매기","딱따구리","종달새","뻐꾸기","기러기","꾀꼬리","황새","날개","깃털","둥지","나비","벌","개미","잠자리","메뚜기","매미","무당벌레","사슴벌레","사마귀","모기","파리","거미","지렁이","달팽이","반딧불이","방아깨비","귀뚜라미","딱정벌레","풍뎅이","하늘소","바퀴벌레","진드기","벼룩","누에","번데기","애벌레","물고기","상어","고래","돌고래","문어","오징어","낙지","새우","게","꽃게","조개","소라","전복","해파리","불가사리","해마","가오리","복어","고등어","갈치","멸치","연어","참치","붕어","잉어","미꾸라지","메기","가재","자라","고둥","오분자기","다슬기","해삼","성게","굴","홍합","바지락","우렁이","사과","배","감","귤","포도","딸기","수박","참외","복숭아","자두","앵두","체리","바나나","오렌지","레몬","라임","키위","망고","멜론","석류","무화과","대추","밤","살구","매실","모과","유자","블루베리","파인애플","코코넛","자몽","한라봉","배추","무","당근","오이","호박","가지","고추","양파","마늘","파","감자","고구마","옥수수","토마토","상추","시금치","콩","완두콩","브로콜리","양배추","버섯","미나리","부추","깻잎","쑥","도라지","연근","우엉","생강","피망","고사리","마","순무","비트","래디시","셀러리","밥","국","김치","라면","국수","만두","김밥","떡볶이","볶음밥","비빔밥","불고기","갈비","삼겹살","치킨","피자","햄버거","샌드위치","스파게티","떡","빵","과자","사탕","초콜릿","젤리","케이크","도넛","쿠키","팝콘","계란","달걀","두부","김","미역","나물","죽","카레","부침개","튀김","순대","어묵","라볶이","김치찌개","된장찌개","김치전","호떡","붕어빵","군고구마","곰탕","설렁탕","삼계탕","냉면","잡채","전골","떡국","송편","약과","엿","꿀","물","우유","주스","콜라","사이다","커피","차","녹차","코코아","요구르트","식혜","두유","수정과","보리차","이온음료","머리","얼굴","눈","코","입","귀","이","이마","볼","턱","목","어깨","팔","손","손가락","손톱","발","발가락","발톱","다리","무릎","등","허리","가슴","엉덩이","머리카락","눈썹","속눈썹","입술","혀","이빨","콧구멍","손바닥","발바닥","팔꿈치","종아리","허벅지","심장","뼈","근육","핏줄","엄마","아빠","형","누나","오빠","언니","동생","할머니","할아버지","삼촌","이모","고모","이모부","고모부","외삼촌","조카","사촌","아기","아들","딸","부모","형제","자매","가족","식구","친척","사람","어린이","아이","친구","선생님","학생","의사","간호사","경찰","소방관","요리사","화가","가수","배우","농부","어부","목수","미용사","우체부","운전사","조종사","과학자","발명가","작가","기자","판사","변호사","군인","대통령","시장","촌장","마술사","광대","도둑","거지","임금","왕자","공주","기사","선비","장군","무사","해적","옷","바지","치마","티셔츠","셔츠","코트","점퍼","조끼","잠옷","속옷","양말","신발","운동화","구두","장화","슬리퍼","모자","장갑","목도리","목걸이","반지","시계","안경","가방","우산","단추","지퍼","벨트","넥타이","손수건","앞치마","한복","교복","수영복","비옷","방한복","머플러","팔찌","귀걸이","집","방","부엌","거실","화장실","문","창문","벽","지붕","계단","마루","다락","베란다","마당","대문","울타리","굴뚝","기와","기둥","현관","안방","서재","창고","지하실","침대","책상","의자","소파","옷장","서랍","책장","식탁","거울","이불","베개","담요","커튼","전등","선풍기","냉장고","세탁기","텔레비전","컴퓨터","전화기","라디오","다리미","청소기","에어컨","난로","히터","전자레인지","밥솥","정수기","그릇","접시","컵","숟가락","젓가락","포크","나이프","냄비","프라이팬","주전자","도마","칼","국자","가위","병","통","바구니","쟁반","주걱","뒤집개","체","깔때기","냅킨","행주","수세미","학교","교실","칠판","책","공책","연필","색연필","지우개","자","풀","크레파스","물감","붓","팔레트","필통","책가방","도화지","색종이","스케치북","컴퍼스","사전","시험","숙제","방학","운동장","도서관","급식","교문","분필","샤프","볼펜","형광펜","공깃돌","공","축구공","농구공","야구공","인형","로봇","블록","퍼즐","팽이","연","구슬","딱지","풍선","그네","미끄럼틀","시소","자전거","킥보드","줄넘기","훌라후프","미로","카드","주사위","바둑","장기","공기","윷","제기","팽이채","연날리기","보드게임","레고","목마","자동차","버스","택시","트럭","기차","지하철","비행기","오토바이","소방차","경찰차","구급차","트랙터","굴착기","헬리콥터","로켓","잠수함","요트","케이블카","열차","전철","마차","썰매","리어카","유모차","포클레인","불도저","기중기","증기선","돛단배","뗏목","하늘","구름","비","바람","번개","천둥","무지개","해","달","별","태양","지구","산","강","바다","호수","계곡","폭포","들","논","밭","숲","나무","꽃","돌","바위","모래","흙","불","얼음","안개","서리","이슬","우박","고드름","눈사람","파도","섬","동굴","언덕","벼랑","골짜기","시냇물","샘물","이슬비","소나기","함박눈","화성","목성","토성","금성","수성","천왕성","해왕성","우주","우주선","위성","은하수","유성","혜성","블랙홀","망원경","별자리","보름달","초승달","반달","일식","월식","장미","튤립","해바라기","국화","코스모스","나팔꽃","민들레","봉선화","진달래","개나리","벚꽃","무궁화","백합","카네이션","목련","동백","안개꽃","제비꽃","할미꽃","맨드라미","채송화","수선화","소나무","은행나무","단풍나무","대나무","버드나무","감나무","밤나무","잎","뿌리","줄기","씨앗","열매","새싹","솔방울","도토리","이끼","넝쿨","선인장","클로버","색깔","빨강","주황","노랑","초록","파랑","보라","하양","검정","분홍","회색","갈색","하늘색","연두","남색","자주","은색","금색","세모","네모","동그라미","원","삼각형","사각형","오각형","육각형","마름모","별표","선","점","면","꼭짓점","공원","놀이터","병원","마트","가게","은행","우체국","박물관","미술관","동물원","식물원","수족관","놀이공원","극장","영화관","식당","카페","목욕탕","미용실","이발소","약국","소방서","경찰서","교회","성당","항구","공항","정류장","터널","광장","시청","마을","동네","골목","거리","시골","도시","농장","목장","과수원","온천","해수욕장","전망대","분수대","피아노","기타","바이올린","첼로","드럼","플루트","트럼펫","하모니카","리코더","실로폰","탬버린","장구","북","꽹과리","가야금","거문고","대금","단소","소고","오카리나","아코디언","하프","트라이앵글","축구","야구","농구","배구","탁구","테니스","배드민턴","수영","태권도","유도","씨름","달리기","스키","스케이트","볼링","골프","등산","체조","마라톤","양궁","펜싱","역도","권투","스노보드","서핑","다이빙","높이뛰기","멀리뛰기","아침","점심","저녁","낮","새벽","오늘","어제","내일","모레","봄","여름","가을","겨울","하루","시간","달력","생일","명절","설날","추석","단오","주말","오전","오후","한낮","한밤","일주일","한달","일년","돈","지갑","열쇠","자물쇠","전화","휴대폰","카메라","편지","우표","봉투","신문","잡지","지도","깃발","초","양초","성냥","부채","빗","칫솔","치약","비누","수건","휴지","빗자루","걸레","쓰레기통","우체통","돋보기","망치","못","톱","드라이버","삽","호미","괭이","낫","바늘","실","자석","건전지","전구","콘센트","플러그","리모컨","이어폰","마이크","스피커","장난감","선물","보물","지폐","동전","저금통","손전등","나침반","저울","온도계","노래","춤","그림","사진","이야기","동화","만화","영화","연극","마술","박수","웃음","목소리","소리","냄새","맛","꿈","생각","마음","약속","비밀","숫자","글자","한글","이름","나라","세계","길","자리","모습","그림자","무늬","점수","이름표","손짓","발자국"];
 /* CORE:END */
@@ -980,20 +1025,20 @@ function saveBestWords(arr){ try{ localStorage.setItem(BESTWORDS_KEY, JSON.strin
 let chainWords = [];
 let chainBest = loadBest();
 let chainBestWords = loadBestWords();
-const WORD_SET = new Set(WORD_DICT);
-const DICT_KEY = "nachmal.chain.dict.v1";
-function loadDictPref(){ try{ return localStorage.getItem(DICT_KEY) !== '0'; }catch(e){ return true; } }
-let chainUseDict = loadDictPref();
-function renderDictToggle(){
-  const b = $('chain-dict-toggle');
-  b.textContent = '📖 사전 검사: ' + (chainUseDict ? '켜짐' : '꺼짐');
-  b.classList.toggle('on', chainUseDict);
+const USERWORDS_KEY = "nachmal.chain.userwords.v1";
+function loadUserWords(){ try{ const a = JSON.parse(localStorage.getItem(USERWORDS_KEY)); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
+function saveUserWords(arr){ try{ localStorage.setItem(USERWORDS_KEY, JSON.stringify(arr)); }catch(e){} }
+let userWords = loadUserWords();
+let WORD_ALL = WORD_DICT.concat(userWords);   // 스캔용(힌트·이어짐 판정)
+let WORD_SET = new Set(WORD_ALL);             // 조회용
+function addUserWord(v){
+  if(!WORD_SET.has(v)){ userWords.push(v); saveUserWords(userWords); WORD_ALL.push(v); WORD_SET.add(v); }
 }
-function toggleDict(){
-  chainUseDict = !chainUseDict;
-  try{ localStorage.setItem(DICT_KEY, chainUseDict ? '1' : '0'); }catch(e){}
-  renderDictToggle();
-}
+let hintWord = null, hintStep = 0;
+let pendingWord = '';
+function say(mood, msg){ const b = $('chain-bubble'); b.textContent = msg; b.className = 'bubble' + (mood ? ' ' + mood : ''); }
+function showRegisterAsk(){ $('register-ask').classList.remove('hidden'); }
+function hideRegisterAsk(){ $('register-ask').classList.add('hidden'); }
 
 function renderWords(el, words){
   el.innerHTML = '';
@@ -1009,38 +1054,77 @@ function renderChain(){
   $('chain-count').textContent = chainWords.length;
   $('chain-best').textContent = chainBest;
 }
-function chainFeedback(ok, msg){ const f=$('chain-feedback'); f.textContent=msg; f.className='feedback '+(ok?'ok':'no'); }
+function resetHint(){ hintWord = null; hintStep = 0; $('chain-hint').textContent = ''; }
+function showHint(){
+  const need = chainWords.length ? [...chainWords[chainWords.length-1]].pop() : '';
+  if(!hintWord){ hintWord = findHint(need, WORD_ALL, chainWords); hintStep = 0; }
+  if(!hintWord){ say('think', `‘${need}’로 시작하는 낱말이 사전에 없어요. 아는 낱말을 등록해 주세요!`); return; }
+  const total = hintStages(hintWord).length;
+  hintStep = Math.min(hintStep + 1, total);
+  $('chain-hint').textContent = '힌트: ' + hintDisplay(hintWord, hintStep);
+  if(hintStep >= total) say('', '이 낱말이에요! 입력해 볼까요?');
+}
 function startChain(){
   finalizeBest();
-  chainWords = [ shuffle(SEED_WORDS)[0] ];
+  const seeds = shuffle(SEED_WORDS);
+  const seed = seeds.find(s => hasContinuation([...s].pop(), WORD_ALL, [s])) || seeds[0];
+  chainWords = [ seed ];
+  resetHint();
+  hideRegisterAsk();
   $('chain-endbox').classList.add('hidden');
   $('chain-play').classList.remove('hidden');
   $('chain-record').classList.add('hidden');
-  $('chain-feedback').textContent=''; $('chain-feedback').className='feedback';
-  $('chain-input').value='';
-  renderDictToggle();
+  $('chain-input').value = '';
   renderChain();
+  say('', `‘${[...seed].pop()}’로 시작하는 낱말을 이어 볼까요?`);
   show('chain');
   setTimeout(()=>$('chain-input').focus(), 60);
 }
+function acceptWord(v, msg){
+  chainWords.push(v);
+  $('chain-input').value = '';
+  resetHint();
+  hideRegisterAsk();
+  renderChain();
+  const need = [...v].pop();
+  if(!hasContinuation(need, WORD_ALL, chainWords)){
+    say('think', `‘${need}’로 시작하는 낱말을 제가 잘 몰라요. 아는 낱말을 입력해 주세요!`);
+  } else {
+    say('ok', msg);
+  }
+  setTimeout(()=>$('chain-input').focus(), 30);
+}
 function submitChain(){
+  hideRegisterAsk();
   const val = $('chain-input').value;
   if(!norm(val)){ $('chain-input').focus(); return; }
   const prev = chainWords[chainWords.length-1];
-  const res = chainCheck(prev, val, chainWords, chainUseDict ? WORD_SET : null);
+  const res = chainCheck(prev, val, chainWords, WORD_SET);
   if(res.ok){
-    chainWords.push(norm(val));
-    $('chain-input').value='';
-    renderChain();
-    chainFeedback(true, '좋아요! 이어졌어요 👏');
+    acceptWord(norm(val), '좋아요! 이어졌어요 👏');
+  }else if(res.reason === 'notindict'){
+    pendingWord = norm(val);
+    say('no', `죄송해요, 제가 모르는 단어예요. ‘${pendingWord}’을(를) 사전에 등록해 드릴까요?`);
+    showRegisterAsk();
   }else{
     let msg = '한글 낱말을 입력해요';
-    if(res.reason==='start') msg = `‘${res.need}’로 시작하는 낱말이에요!`;
-    else if(res.reason==='reuse') msg = '이미 쓴 낱말이에요';
-    else if(res.reason==='notindict') msg = '그런 낱말은 몰라요 🤔';
-    chainFeedback(false, msg);
+    if(res.reason === 'start') msg = `‘${res.need}’로 시작해야 해요!`;
+    else if(res.reason === 'reuse') msg = '이미 쓴 낱말이에요';
+    say('no', msg);
     $('chain-input').select();
   }
+}
+function confirmRegister(){
+  const w = pendingWord;
+  hideRegisterAsk();
+  if(!w) return;
+  addUserWord(w);
+  acceptWord(w, '등록했어요! 이어갈게요 👍');
+}
+function declineRegister(){
+  hideRegisterAsk();
+  say('', '그럼 다른 낱말로 해볼까요?');
+  const inp = $('chain-input'); inp.select(); inp.focus();
 }
 function finalizeBest(){ if(chainWords.length > chainBest){ chainBest = chainWords.length; chainBestWords = chainWords.slice(); saveBest(chainBest); saveBestWords(chainBestWords); return true; } return false; }
 function endChain(){
@@ -1050,6 +1134,7 @@ function endChain(){
   $('chain-endtext').textContent = `🔗 ${chainWords.length}개 이어봤어요!`;
   $('chain-record').classList.toggle('hidden', !rec);
   $('chain-best').textContent = chainBest;
+  say('ok', '재밌었어요! 또 해요 😊');
 }
 function leaveChain(){ finalizeBest(); show('home'); }
 function openRecord(){
@@ -1096,10 +1181,11 @@ $('btn-reset-chain').addEventListener('click', ()=>{
   }
 });
 $('chain-submit').addEventListener('click', submitChain);
-$('chain-dict-toggle').addEventListener('click', toggleDict);
 $('chain-input').addEventListener('keydown', e=>{ if(e.key==='Enter') submitChain(); });
-$('chain-reroll').addEventListener('click', startChain);
-$('chain-end').addEventListener('click', endChain);
+$('chain-hint-btn').addEventListener('click', showHint);
+$('chain-end-x').addEventListener('click', ()=>endChain());
+$('register-yes').addEventListener('click', confirmRegister);
+$('register-no').addEventListener('click', declineRegister);
 $('chain-restart').addEventListener('click', startChain);
 $('btn-chain-home').addEventListener('click', leaveChain);
 $('chain-home2').addEventListener('click', leaveChain);
