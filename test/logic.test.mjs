@@ -7,7 +7,8 @@ const CORE_NAMES = [
   'parseTemplate','DEFAULT_TEMPLATES','DEFAULT_WORDS','buildAnswerBoxes',
   'isCorrectTyped','makeLetterDistractors','makeOptions','templateFromV1','pickRound',
   'chainCheck','WORD_DICT','isHangulSyllable','SEED_WORDS',
-  'hintStages','hintDisplay','hasContinuation','findHint'
+  'hintStages','hintDisplay','hasContinuation','findHint',
+  'chosungOf','chosungHint'
 ];
 
 function loadCore(){
@@ -386,4 +387,31 @@ test('index.html: 대화형 UI 배선(토글 제거)', () => {
   assert.ok(html.includes('function confirmRegister'));
   assert.ok(!html.includes('id="chain-dict-toggle"'));   // 토글 제거됨
   assert.ok(!html.includes('id="chain-reroll"'));        // 다른 낱말 제거됨
+});
+test('chosungOf: 낱말의 초성열', () => {
+  const { chosungOf } = loadCore();
+  assert.equal(chosungOf('사과'), 'ㅅㄱ');
+  assert.equal(chosungOf('학교'), 'ㅎㄱ');
+  assert.equal(chosungOf('값'), 'ㄱ');            // 받침 있어도 초성만
+  assert.equal(chosungOf('컴퓨터'), 'ㅋㅍㅌ');
+  assert.equal(chosungOf('abc'), null);           // 비한글
+  assert.equal(chosungOf('사a과'), null);
+});
+test('chosungHint: 초성→모음→받침 순 공개', () => {
+  const { chosungHint } = loadCore();
+  assert.equal(chosungHint('사과', 0), 'ㅅ ㄱ');   // 초성만(문제와 동일)
+  assert.equal(chosungHint('사과', 1), '사 ㄱ');
+  assert.equal(chosungHint('사과', 2), '사 과');
+  assert.equal(chosungHint('강산', 0), 'ㄱ ㅅ');   // 받침 낱말
+  assert.equal(chosungHint('강산', 4), '강 산');
+});
+test('index.html: 초성게임 배선', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.ok(html.includes('id="screen-chosung"'));
+  assert.ok(html.includes('data-mode="chosung"'));
+  assert.ok(html.includes("chosung:$('screen-chosung')"));
+  assert.ok(html.includes('function startChosung'));
+  assert.ok(html.includes('function submitChosung'));
+  assert.ok(html.includes("if(m==='chosung') startChosung()"));
+  assert.ok(html.includes('nachmal.chosung.best.v1'));
 });
