@@ -1131,6 +1131,34 @@ window.__dictLoaded = false;
       .catch(()=>{});
   }catch(e){}
 })();
+
+// 로컬 사전에 없는 낱말 온라인 폴백: 위키낱말사전·위키백과 중 하나라도 문서가 있으면 실재 낱말로 인정.
+// (게임 입력은 이미 한글만 통과하므로 영어 등은 여기까지 오지 않음.)
+const _wikiCache = new Map();          // 세션 내 조회 결과 캐시 (양성·음성 모두)
+let chainBusy = false, chosungBusy = false;
+function _fetchTimeout(url, ms){
+  const ac = new AbortController();
+  const t = setTimeout(()=>ac.abort(), ms);
+  return fetch(url, { signal: ac.signal }).finally(()=>clearTimeout(t));
+}
+async function wikiHasWord(word){
+  if(_wikiCache.has(word)) return _wikiCache.get(word);
+  const sites = ['ko.wiktionary.org', 'ko.wikipedia.org'];
+  for(const site of sites){
+    try{
+      const url = `https://${site}/w/api.php?action=query&format=json&origin=*&redirects=1&titles=${encodeURIComponent(word)}`;
+      const r = await _fetchTimeout(url, 4000);
+      if(!r.ok) continue;
+      const j = await r.json();
+      const pages = j && j.query && j.query.pages;
+      if(!pages) continue;
+      const p = Object.values(pages)[0];
+      if(p && !('missing' in p) && !('invalid' in p)){ _wikiCache.set(word, true); return true; }
+    }catch(e){ /* 네트워크 오류·타임아웃 → 다음 사이트, 최종 실패 시 false */ }
+  }
+  _wikiCache.set(word, false);
+  return false;
+}
 let hintWord = null, hintStep = 0;
 let pendingWord = '';
 function say(mood, msg){ const b = $('chain-bubble'); b.textContent = msg; b.className = 'bubble' + (mood ? ' ' + mood : ''); }
@@ -1209,7 +1237,8 @@ function acceptWord(v, msg){
   }
   setTimeout(()=>$('chain-input').focus(), 30);
 }
-function submitChain(){
+async function submitChain(){
+  if(chainBusy) return;
   hideRegisterAsk();
   const val = $('chain-input').value;
   if(!norm(val)){ $('chain-input').focus(); return; }
@@ -1218,9 +1247,21 @@ function submitChain(){
   if(res.ok){
     acceptWord(norm(val), '좋아요! 이어졌어요 👏');
   }else if(res.reason === 'notindict'){
-    pendingWord = norm(val);
-    say('no', `죄송해요, 제가 모르는 단어예요. ‘${pendingWord}’을(를) 사전에 등록해 드릴까요?`);
-    showRegisterAsk();
+    const w = norm(val);
+    chainBusy = true;
+    say('think', `‘${w}’… 낱말을 찾아보는 중이에요 🔎`);
+    const found = await wikiHasWord(w);
+    chainBusy = false;
+    // 조회 중 다른 낱말이 이어졌을 수 있으니 마지막 낱말이 그대로인지 확인
+    if(chainWords[chainWords.length-1] !== prev) return;
+    if(found){
+      addUserWord(w);                       // 위키 확인 → 로컬 사전에 자동 저장
+      acceptWord(w, '위키에서 찾았어요! 이어졌어요 👏');
+    }else{
+      pendingWord = w;
+      say('no', `죄송해요, 위키에서도 못 찾았어요. ‘${w}’을(를) 사전에 등록해 드릴까요?`);
+      showRegisterAsk();
+    }
   }else{
     let msg = '한글 낱말을 입력해요';
     if(res.reason === 'start') msg = `‘${res.need}’로 시작해야 해요!`;
@@ -1345,7 +1386,8 @@ function changeChosungProblem(){
   choSay('', '다른 낱말로 바꿨어요! 🔄');
   setTimeout(()=>$('chosung-input').focus(), 30);
 }
-function submitChosung(){
+async function submitChosung(){
+  if(chosungBusy) return;
   choHideAsk();
   const val = $('chosung-input').value;
   const v = norm(val);
@@ -1357,9 +1399,20 @@ function submitChosung(){
   }
   if(WORD_SET.has(v)){
     chosungCorrect('정답이에요! 👏 다음 문제예요');
+    return;
+  }
+  const askedPattern = chosungPattern;
+  chosungBusy = true;
+  choSay('think', `‘${v}’… 낱말을 찾아보는 중이에요 🔎`);
+  const found = await wikiHasWord(v);
+  chosungBusy = false;
+  if(chosungPattern !== askedPattern) return;   // 조회 중 문제가 바뀌었으면 무시
+  if(found){
+    addUserWord(v);                              // 위키 확인 → 로컬 사전에 자동 저장
+    chosungCorrect('위키에서 찾았어요! 정답이에요 👏 다음 문제예요');
   }else{
     chosungPending = v;
-    choSay('no', `‘${v}’는 제가 모르는 단어예요. 사전에 등록해 드릴까요?`);
+    choSay('no', `‘${v}’는 위키에서도 못 찾았어요. 사전에 등록해 드릴까요?`);
     choShowAsk();
   }
 }
