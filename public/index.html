@@ -1256,11 +1256,41 @@ function renderChosung(){
   $('chosung-score').textContent = chosungScore;
   $('chosung-best').textContent = chosungBest;
 }
+// 초성 패턴별 낱말 색인 — 같은 초성으로 3개 이상 낱말이 있는 쉬운 패턴만 문제로 냄
+let _choIdx = null, _choIdxLen = -1;
+function chosungIndex(){
+  if(_choIdx && _choIdxLen === WORD_ALL.length) return _choIdx;
+  const map = new Map();
+  for(const w of WORD_ALL){
+    const n = [...w].length;
+    if(n < 2 || n > 4) continue;         // 2~4글자 (초성 하나짜리 방지)
+    const p = chosungOf(w);
+    if(!p) continue;
+    let arr = map.get(p);
+    if(!arr){ arr = []; map.set(p, arr); }
+    arr.push(w);
+  }
+  const easy = [];                        // 같은 초성 낱말 3개 이상인 패턴
+  for(const [p, arr] of map){ if(arr.length >= 3) easy.push(p); }
+  _choIdx = { map, easy };
+  _choIdxLen = WORD_ALL.length;
+  return _choIdx;
+}
 function newChosungProblem(){
-  // 2~4글자 낱말로 문제 (초성 하나짜리 방지)
-  const pool = WORD_ALL.filter(w=>{ const n=[...w].length; return n>=2 && n<=4; });
-  chosungWord = shuffle(pool.length ? pool : WORD_ALL)[0];
-  chosungPattern = chosungOf(chosungWord) || '';
+  const idx = chosungIndex();
+  if(idx.easy.length){
+    // 직전 문제와 안 겹치게 (가능하면) 쉬운 패턴 하나 선택
+    const cur = chosungPattern;
+    let pattern = shuffle(idx.easy)[0];
+    if(idx.easy.length > 1 && pattern === cur) pattern = shuffle(idx.easy.filter(p=>p!==cur))[0];
+    chosungPattern = pattern;
+    chosungWord = shuffle(idx.map.get(pattern))[0];   // 힌트용 대표 낱말
+  }else{
+    // 폴백: 3개 이상 패턴이 없으면 기존 방식(2~4글자 아무 낱말)
+    const pool = WORD_ALL.filter(w=>{ const n=[...w].length; return n>=2 && n<=4; });
+    chosungWord = shuffle(pool.length ? pool : WORD_ALL)[0];
+    chosungPattern = chosungOf(chosungWord) || '';
+  }
   chosungHintStep = 0;
   $('chosung-hint').textContent = '';
   $('chosung-input').value = '';
