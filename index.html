@@ -326,6 +326,9 @@
       <button class="ghostbtn" id="btn-reset-chain">↺ 끝말잇기 기록 초기화</button>
     </div>
     <div class="footer-tag" id="word-count-tag"></div>
+    <div class="footer-tag" style="opacity:.6; font-size:.72rem; margin-top:4px">
+      낱말 검증 사전: 국립국어원 개방형 사전 기반 · spellcheck-ko (CC BY-SA 2.0 KR)
+    </div>
   </section>
 
   <!-- ============ QUIZ ============ -->
@@ -1105,11 +1108,29 @@ const USERWORDS_KEY = "nachmal.chain.userwords.v1";
 function loadUserWords(){ try{ const a = JSON.parse(localStorage.getItem(USERWORDS_KEY)); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
 function saveUserWords(arr){ try{ localStorage.setItem(USERWORDS_KEY, JSON.stringify(arr)); }catch(e){} }
 let userWords = loadUserWords();
-let WORD_ALL = WORD_DICT.concat(userWords);   // 스캔용(힌트·이어짐 판정)
+let WORD_ALL = WORD_DICT.concat(userWords);   // 스캔·검증용(힌트·이어짐 판정) — 대용량 사전 로드 후 확장됨
 let WORD_SET = new Set(WORD_ALL);             // 조회용
 function addUserWord(v){
   if(!WORD_SET.has(v)){ userWords.push(v); saveUserWords(userWords); WORD_ALL.push(v); WORD_SET.add(v); }
 }
+// 대용량 검증 사전 비동기 로드 (출처: 국립국어원 개방형 사전 기반 · spellcheck-ko, CC-BY-SA-2.0-KR).
+// 실패(오프라인 등) 시 기존 큐레이션 사전으로 그대로 동작. 출제는 WORD_DICT(흔한 단어)만 사용.
+window.__dictLoaded = false;
+(function loadBigDict(){
+  try{
+    fetch('words.v1.txt', { cache:'force-cache' })
+      .then(r => r.ok ? r.text() : Promise.reject(r.status))
+      .then(text => {
+        let added = 0;
+        for(const w of text.split('\n')){
+          if(w && !WORD_SET.has(w)){ WORD_SET.add(w); WORD_ALL.push(w); added++; }
+        }
+        window.__dictLoaded = true;
+        window.__dictCount = WORD_SET.size;
+      })
+      .catch(()=>{});
+  }catch(e){}
+})();
 let hintWord = null, hintStep = 0;
 let pendingWord = '';
 function say(mood, msg){ const b = $('chain-bubble'); b.textContent = msg; b.className = 'bubble' + (mood ? ' ' + mood : ''); }
@@ -1259,6 +1280,8 @@ function renderChosung(){
 // 초성 패턴별 낱말 색인 — 같은 초성으로 3개 이상 낱말이 있는 쉬운 패턴만 문제로 냄
 let _choIdx = null, _choIdxLen = -1;
 function chosungIndex(){
+  // 출제도 대용량 검증 사전(WORD_ALL) 기준. 같은 초성 낱말이 15개 이상인 패턴만 출제 → 정답 후보가 많아 쉬움.
+  // WORD_ALL은 대용량 사전 로드 후 커지므로, 길이가 바뀌면 색인을 다시 만든다.
   if(_choIdx && _choIdxLen === WORD_ALL.length) return _choIdx;
   const map = new Map();
   for(const w of WORD_ALL){
@@ -1270,8 +1293,8 @@ function chosungIndex(){
     if(!arr){ arr = []; map.set(p, arr); }
     arr.push(w);
   }
-  const easy = [];                        // 같은 초성 낱말 5개 이상인 패턴
-  for(const [p, arr] of map){ if(arr.length >= 5) easy.push(p); }
+  const easy = [];                        // 같은 초성 낱말 15개 이상인 패턴
+  for(const [p, arr] of map){ if(arr.length >= 15) easy.push(p); }
   _choIdx = { map, easy };
   _choIdxLen = WORD_ALL.length;
   return _choIdx;
