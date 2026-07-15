@@ -1,0 +1,51 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "nunus": {
+      ".read": "auth != null",
+
+      "$game": {
+        "meta": {
+          ".write": "auth != null",
+          ".validate": "newData.hasChildren(['gameId','round','phase'])",
+          "gameId":     { ".validate": "newData.isNumber() && newData.val() >= 0" },
+          "round":      { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() < 1000" },
+          "phase":      { ".validate": "newData.val() === 'play' || newData.val() === 'reveal' || newData.val() === 'over'" },
+          "winner":     { ".validate": "newData.isString() && newData.val().length <= 64" },
+          "winnerName": { ".validate": "newData.isString() && newData.val().length <= 24" },
+          "answer":     { ".validate": "newData.isString() && newData.val().length <= 40" },
+          "need":       { ".validate": "newData.isString() && newData.val().length <= 2" },
+          "pattern":    { ".validate": "newData.isString() && newData.val().length <= 16" },
+          "startedAt":  { ".validate": "newData.isNumber()" },
+          "deadline":   { ".validate": "newData.isNumber()" },
+          "chain":      { ".validate": "newData.hasChildren() || newData.val() == null" },
+          "used":       { ".validate": "newData.hasChildren() || newData.val() == null" },
+          "$other":     { ".validate": false }
+        },
+
+        "presence": {
+          "$pid": {
+            ".write": "auth != null && auth.uid === $pid",
+            ".validate": "newData.hasChildren(['name','ts'])",
+            "name": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 24" },
+            "ts":   { ".validate": "newData.isNumber()" },
+            "$o":   { ".validate": false }
+          }
+        },
+
+        "scores": {
+          "$gameId": {
+            "$pid": {
+              ".write": "auth != null && auth.uid === $pid",
+              ".validate": "newData.isNumber() && newData.val() === (data.exists() ? data.val() : 0) + 1"
+            }
+          }
+        },
+
+        "$other": { ".validate": false }
+      }
+    }
+  }
+}
