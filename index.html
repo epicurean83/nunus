@@ -1270,8 +1270,8 @@ function chosungIndex(){
     if(!arr){ arr = []; map.set(p, arr); }
     arr.push(w);
   }
-  const easy = [];                        // 같은 초성 낱말 3개 이상인 패턴
-  for(const [p, arr] of map){ if(arr.length >= 3) easy.push(p); }
+  const easy = [];                        // 같은 초성 낱말 5개 이상인 패턴
+  for(const [p, arr] of map){ if(arr.length >= 5) easy.push(p); }
   _choIdx = { map, easy };
   _choIdxLen = WORD_ALL.length;
   return _choIdx;
