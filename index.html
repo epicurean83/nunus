@@ -1280,7 +1280,7 @@ function renderChosung(){
 // 초성 패턴별 낱말 색인 — 같은 초성으로 3개 이상 낱말이 있는 쉬운 패턴만 문제로 냄
 let _choIdx = null, _choIdxLen = -1;
 function chosungIndex(){
-  // 출제도 대용량 검증 사전(WORD_ALL) 기준. 같은 초성 낱말이 15개 이상인 패턴만 출제 → 정답 후보가 많아 쉬움.
+  // 출제도 대용량 검증 사전(WORD_ALL) 기준. 같은 초성 낱말이 20개 이상인 패턴만 출제 → 정답 후보가 많아 쉬움.
   // WORD_ALL은 대용량 사전 로드 후 커지므로, 길이가 바뀌면 색인을 다시 만든다.
   if(_choIdx && _choIdxLen === WORD_ALL.length) return _choIdx;
   const map = new Map();
@@ -1293,8 +1293,8 @@ function chosungIndex(){
     if(!arr){ arr = []; map.set(p, arr); }
     arr.push(w);
   }
-  const easy = [];                        // 같은 초성 낱말 15개 이상인 패턴
-  for(const [p, arr] of map){ if(arr.length >= 15) easy.push(p); }
+  const easy = [];                        // 같은 초성 낱말 20개 이상인 패턴
+  for(const [p, arr] of map){ if(arr.length >= 20) easy.push(p); }
   _choIdx = { map, easy };
   _choIdxLen = WORD_ALL.length;
   return _choIdx;
