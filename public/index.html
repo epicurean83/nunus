@@ -1672,6 +1672,7 @@ function enterRoom(){
       $('multi-input').disabled = true;
       $('multi-submit').disabled = true;
       $('multi-swap').innerHTML = '';
+      swapSig = null;
     }else{
       const me2 = MG.ref.child('presence/' + MG.uid);
       me2.onDisconnect().remove();
@@ -1984,7 +1985,7 @@ function renderSwapUI(){
         // 계속 이어져 온 것이다(라운드가 넘어오며 phase가 play로 막 돌아온 상황). 그때는
         // renderMulti가 이미 이 라운드의 안내를 mSay로 띄워 놨으니 여기서 또 덮어쓰지 않는다.
         // 실제로 방금 거부된 순간(voter/requester/voted → cooldown)에는 prevSig가 그중 하나이므로 정상 공지된다.
-        if(prevSig !== 'inactive') mSay('방금 거부됐어. 조금만 더 생각해보자!');
+        if(prevSig !== 'inactive' && prevSig !== null) mSay('방금 거부됐어. 조금만 더 생각해보자!');
       }else{
         el.innerHTML = '<button class="btn btn-soft" id="multi-swap-ask">🔄 문제 교체 요청</button>';
         $('multi-swap-ask').addEventListener('click', askSwap);
