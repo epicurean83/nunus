@@ -191,6 +191,10 @@ echo "규칙 검증 (uid A=$UA)"
 # (meta는 gameId/round/phase를 필수로 요구한다).
 chk "meta 부트스트랩 허용" 200 \
   "$(code -X PUT "$DB/nunus/chain/meta.json?auth=$TA" -d '{"gameId":1,"round":1,"phase":"play"}')"
+# vote는 presence/$pid 아래에 산다. 그 노드의 validate가 name/ts를 요구하고
+# RTDB validate는 상위로 전파되므로, presence를 먼저 만들어야 vote를 시험할 수 있다.
+chk "presence 부트스트랩 허용" 200 \
+  "$(code -X PUT "$DB/nunus/chain/presence/$UA.json?auth=$TA" -d '{"name":"가가","ts":1}')"
 chk "내 vote 쓰기 허용" 200 \
   "$(code -X PUT "$DB/nunus/chain/presence/$UA/vote.json?auth=$TA" -d '{"req":1,"ok":true}')"
 chk "남의 vote 쓰기 차단" 401 \
