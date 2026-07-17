@@ -27,6 +27,7 @@
   appId: "1:952923689342:web:4dd6eff3df360fe5a2e32f"
   ```
 - localStorage 키: `NICK_KEY = "nachmal.multi.nick.v1"` (기존 `nachmal.*` 관례).
+- **DB 정리 범위.** Task 10(배포) **전까지만** `firebase database:remove /nunus --force`가 안전하다 — 그때까진 이 RTDB에 우리 테스트 데이터밖에 없다(인스턴스를 이번 작업에서 새로 만들었고 공유 프로젝트의 NearBy 프로덕션은 이 RTDB를 쓰지 않는다. 루트가 `null`인 것으로 확인). **배포 이후에는 `/nunus` 통째 삭제 금지** — 그 시점부터 거기엔 남들이 실제로 하는 게임이 들어있다. 지워야 하면 내가 만든 경로만 좁혀 지운다(예: `/nunus/chain/presence/<내uid>`).
 - 라운드 수 `MULTI_ROUNDS = 10`, reveal 대기 `REVEAL_MS = 3000`, 교체 투표 `SWAP_VOTE_MS = 20000`, 거부 쿨다운 `SWAP_COOL_MS = 30000`.
 
 ---
