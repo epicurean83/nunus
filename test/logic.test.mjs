@@ -8,7 +8,8 @@ const CORE_NAMES = [
   'isCorrectTyped','makeLetterDistractors','makeOptions','templateFromV1','pickRound',
   'chainCheck','WORD_DICT','isHangulSyllable','SEED_WORDS',
   'hintStages','hintDisplay','hasContinuation','findHint',
-  'chosungOf','chosungHint'
+  'chosungOf','chosungHint',
+  'pickHost','swapOutcome'
 ];
 
 function loadCore(){
@@ -414,4 +415,59 @@ test('index.html: 초성게임 배선', () => {
   assert.ok(html.includes('function submitChosung'));
   assert.ok(html.includes("if(m==='chosung') startChosung()"));
   assert.ok(html.includes('nachmal.chosung.best.v1'));
+});
+
+test('pickHost: 사전순 최소 uid가 호스트', () => {
+  const { pickHost } = loadCore();
+  assert.equal(pickHost(['zeta','alpha','mid']), 'alpha');
+  assert.equal(pickHost(['only']), 'only');
+  assert.equal(pickHost([]), null);
+  assert.equal(pickHost(null), null);
+});
+
+test('swapOutcome: 요청 없으면 none, 지난 라운드 요청은 stale', () => {
+  const { swapOutcome } = loadCore();
+  assert.equal(swapOutcome(null, [], 3, 1000, 5), 'none');
+  const stale = { by:'a', round:4, until:9999 };            // 4라운드 요청인데 지금 5라운드
+  assert.equal(swapOutcome(stale, [], 3, 1000, 5), 'stale');
+});
+
+test('swapOutcome: 거부 한 명이면 즉시 취소 (마감 지나도 거부 우선)', () => {
+  const { swapOutcome } = loadCore();
+  const swap = { by:'a', round:5, until:2000 };
+  const votes = [{req:2000,ok:true},{req:2000,ok:false}];
+  assert.equal(swapOutcome(swap, votes, 3, 1000, 5), 'cancel');
+  assert.equal(swapOutcome(swap, votes, 3, 9999, 5), 'cancel');
+});
+
+test('swapOutcome: 전원 찬성이면 마감 전이라도 즉시 교체', () => {
+  const { swapOutcome } = loadCore();
+  const swap = { by:'a', round:5, until:9999 };
+  const votes = [{req:9999,ok:true},{req:9999,ok:true},{req:9999,ok:true}];
+  assert.equal(swapOutcome(swap, votes, 3, 1000, 5), 'swap');
+});
+
+test('swapOutcome: 20초 지나면 묵시적 동의로 교체 (자리 비운 사람이 못 막음)', () => {
+  const { swapOutcome } = loadCore();
+  const swap = { by:'a', round:5, until:2000 };
+  const votes = [{req:2000,ok:true}];          // 3명 중 1명만 투표
+  assert.equal(swapOutcome(swap, votes, 3, 1999, 5), 'wait');
+  assert.equal(swapOutcome(swap, votes, 3, 2001, 5), 'swap');
+});
+
+test('swapOutcome: 혼자면 자기 찬성만으로 즉시 교체', () => {
+  const { swapOutcome } = loadCore();
+  const swap = { by:'a', round:5, until:9999 };
+  assert.equal(swapOutcome(swap, [{req:9999,ok:true}], 1, 1000, 5), 'swap');
+});
+
+test('swapOutcome: 지난 요청의 표는 새 요청에 안 딸려온다', () => {
+  const { swapOutcome } = loadCore();
+  // 같은 5라운드에서 두 번째 요청(until=8888). 첫 요청(until=5555) 때 받은 찬성표는
+  // req가 안 맞으므로 무효 — 안 그러면 남들이 거부할 새도 없이 즉시 통과해버린다.
+  const swap2 = { by:'a', round:5, until:8888 };
+  const old   = [{req:5555,ok:true},{req:5555,ok:true},{req:5555,ok:true}];
+  assert.equal(swapOutcome(swap2, old, 3, 1000, 5), 'wait');
+  // 요청자 본인 표(새 req)만 있으면 여전히 대기
+  assert.equal(swapOutcome(swap2, [{req:8888,ok:true}], 3, 1000, 5), 'wait');
 });
