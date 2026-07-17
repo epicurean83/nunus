@@ -46,3 +46,24 @@ Task 6: complete (commit 16bda9c, review clean + 브라우저 확인)
   - 보안 속성 실증: 라이브 meta를 페이지에서 읽어 phase='play'일 때 answer 키 없음 확인.
   - Minor(미해결): newProblem의 chosung 분기에 idx.easy가 빈 경우 폴백 없음 → pattern undefined 가능.
     스펙 스니펫에서 온 것. WORD_DICT(4k)가 20+ 임계를 이미 넘겨 솔로에서 잘 도는 중이라 실제론 안 걸림.
+Task 7: complete (commits 3970397..370a979, opus 리뷰 → 7개 수정 → 재리뷰 Approved)
+  - meta 트랜잭션 레이스 판정, 점수, hostTick, restartMulti. 65/65.
+  - opus 리뷰가 Critical 1 + Important 4 발견, 전부 수정:
+    * (C) 호스트가 reveal 중 나가면 방이 영구 정지 → presence 핸들러가 renderMulti() 호출
+    * (I) 트랜잭션 로컬 선적용 탓에 진 사람이 "이겼어요" 깜빡임 → 모든 meta 트랜잭션 applyLocally=false
+    * (I) 점수 콜백이 가변 전역 MG.meta.gameId 사용 → 커밋된 스냅샷 + myRef 세션 확인
+    * (I) restartMulti에 phase 가드 없어 둘이 누르면 gameId 건너뜀 → phase!=='over'면 abort
+    * (I) 재시작 후 점수칩이 옛 점수 유지 → MG.allScores + refreshScores() 단일 출처
+  - 검증: 진짜 경쟁 레이스 3회(승자 Alice/Alice/Bob으로 갈림 = 진짜 경쟁), Critical은
+    옛 커밋을 별도 포트에 띄워 fail-before(12.1s 정지)/pass-after(3.25s 복구) 증명.
+
+  >>> TASK 9가 반드시 닫아야 할 구멍 (재리뷰 지적):
+      레이스 하네스가 진 쪽의 트랜잭션 결과를 기록하지 않는다. 진 쪽 setTimeout이 이미 reveal로
+      넘어간 뒤 발화하면 submitMulti가 phase!=='play'로 조기 리턴해 트랜잭션을 아예 안 건다 —
+      그래도 "승자 1명"으로 통과한다. 즉 "서버 게이트가 동시 커밋을 거부했다"가 관찰이 아니라 추론.
+      → multi-race.mjs는 진 쪽에서 committed===false를 실제로 관찰해 기록해야 한다.
+
+  Minor(미해결, 최종리뷰에서 판단):
+   - multi-input.value='' 가 세션 가드보다 위에 있어, 나간 방의 콜백이 새 방 입력을 지울 수 있음
+   - applyLocally=false 탓에 제출 후 1 RTT 동안 입력창이 열려있음(중복 제출은 서버가 abort, 무해)
+   - 7개 수정 중 어느 것도 회귀 테스트로 고정되지 않음(수동 브라우저 검증에만 의존)
