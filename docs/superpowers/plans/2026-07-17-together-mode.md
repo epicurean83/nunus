@@ -187,6 +187,10 @@ chk(){ # chk <라벨> <기대코드> <실제코드>
 }
 
 echo "규칙 검증 (uid A=$UA)"
+# meta 하위 필드를 시험하려면 meta가 먼저 정상 상태여야 한다
+# (meta는 gameId/round/phase를 필수로 요구한다).
+chk "meta 부트스트랩 허용" 200 \
+  "$(code -X PUT "$DB/nunus/chain/meta.json?auth=$TA" -d '{"gameId":1,"round":1,"phase":"play"}')"
 chk "내 vote 쓰기 허용" 200 \
   "$(code -X PUT "$DB/nunus/chain/presence/$UA/vote.json?auth=$TA" -d '{"req":1,"ok":true}')"
 chk "남의 vote 쓰기 차단" 401 \

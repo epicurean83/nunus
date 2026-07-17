@@ -275,7 +275,7 @@ else                             → 대기
 
 1. **삭제**: 루트 `index.html` — `public/index.html`과 105KB 중복본. 양쪽 수정 누락으로 조용히 어긋날 위험 제거.
 2. **수정**: `test/logic.test.mjs` — `../index.html` → `../public/index.html` (**13곳**). CORE 추출·배선 검사 대상이 유일본을 가리키게.
-3. **수정**: `public/index.html` — Firebase SDK(compat, CDN) + `screen-multi` + `#modepick-overlay` + 멀티 로직. CORE 블록·혼자하기 경로 무변경.
+3. **수정**: `public/index.html` — Firebase SDK(compat, CDN) + `screen-multi` + `#modepick-overlay` + 멀티 로직. **혼자하기 경로 무변경.** CORE는 기존 함수를 건드리지 않되, 순수 로직 `pickHost`/`swapOutcome` 두 개는 CORE에 **추가**한다(`CORE_NAMES`에도 등록). 교체 투표 집계가 이 설계에서 제일 틀리기 쉬운데 DOM·네트워크에 묶어두면 단위 테스트가 불가능하고, 저장소 관례상 순수 로직은 CORE에 넣어 Node로 검증해왔다(`pickRound`, `chainCheck`가 그렇게 들어갔다).
 4. **수정 + 재배포**: `database.rules.json` — `meta.swap` / `meta.swapCool` / `presence.$pid.vote` 추가. 이거 없이는 교체 요청 쓰기가 전부 거부된다. `firebase deploy --only database`.
 5. `artifact.html`, `firebase.json` 미변경.
 
