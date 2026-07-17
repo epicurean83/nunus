@@ -517,3 +517,13 @@ test('public/index.html: 같이하기 문제 출제/구독 배선', () => {
   // 정답을 DB에 올리면 안 된다: 출제 시 answer를 쓰지 않는지
   assert.doesNotMatch(html, /newProblem[\s\S]{0,400}answer:/, '출제 때 answer를 쓰면 안 됨');
 });
+
+test('public/index.html: 같이하기 승부/점수 배선', () => {
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  assert.match(html, /function submitMulti\(/, 'submitMulti가 있어야');
+  assert.match(html, /function hostTick\(/, 'hostTick이 있어야');
+  assert.match(html, /function restartMulti\(/, 'restartMulti가 있어야');
+  assert.match(html, /\.child\('meta'\)\.transaction\(/, '승부는 meta 트랜잭션이어야');
+  assert.match(html, /scores\/'\s*\+\s*[\s\S]{0,60}gameId/, '점수는 gameId로 키잉해야');
+  assert.match(html, /MULTI_ROUNDS/, '라운드 상한을 써야');
+});
