@@ -118,7 +118,8 @@ meta/
                                                    헷갈리지 않도록 일부러 다른 이름)
   swapCool    int                               ← 신설. 거부 후 재요청 가능 시각
 presence/{uid}   {name, ts, vote?}   onDisconnect().remove()
-                 vote = {round, ok}             ← 신설. 이 라운드 교체에 찬/반
+                 vote = {req, ok}               ← 신설. req = 투표 대상 요청의 swap.until
+                                                  (요청마다 유일). 찬성 ok:true / 거부 false
 scores/{gameId}/{uid}  int     본인만 +1씩
 ```
 
@@ -126,7 +127,9 @@ scores/{gameId}/{uid}  int     본인만 +1씩
 
 **투표는 반드시 `presence/{uid}` 안에 둔다.** `meta`는 인증된 누구나 쓸 수 있어서 거기 두면 남의 표를 위조할 수 있다. `presence/{uid}`는 규칙이 이미 `auth.uid === $pid`로 소유권을 강제하므로, **남이 내 표를 대신 던질 수 없고** 접속이 끊기면 표도 같이 사라진다.
 
-`vote.round`를 같이 저장하는 이유: 라운드가 넘어가면 지난 표는 `round` 불일치로 **저절로 무효**가 된다. 라운드마다 표를 지우는 쓰기가 필요 없다.
+**표는 라운드가 아니라 요청 단위로 묶는다.** `vote.req`에 그 요청의 `swap.until`(요청마다 유일한 값)을 넣는다. 그러면 지난 표는 `req` 불일치로 **저절로 무효**가 되므로 표를 지우는 쓰기가 아예 필요 없다.
+
+라운드로 묶으면 안 되는 이유: 한 라운드에서 교체가 두 번 일어나면 첫 요청의 찬성표가 두 번째 요청에 그대로 재활용돼, 남들이 거부할 새도 없이 즉시 통과한다. 게다가 규칙상 표는 본인만 쓸 수 있어서 **호스트가 남의 표를 대신 지우는 것도 불가능하다**(그게 위조를 막는 장치다). `req` 단위로 묶으면 두 문제가 같이 사라진다.
 
 규칙 추가분:
 ```json
@@ -143,10 +146,10 @@ scores/{gameId}/{uid}  int     본인만 +1씩
 "presence": {
   "$pid": {
     "vote": {
-      ".validate": "newData.hasChildren(['round','ok']) || !newData.exists()",
-      "round": { ".validate": "newData.isNumber()" },
-      "ok":    { ".validate": "newData.isBoolean()" },
-      "$o":    { ".validate": false }
+      ".validate": "newData.hasChildren(['req','ok']) || !newData.exists()",
+      "req": { ".validate": "newData.isNumber()" },
+      "ok":  { ".validate": "newData.isBoolean()" },
+      "$o":  { ".validate": false }
     }
   }
 }
@@ -201,13 +204,14 @@ scores/{gameId}/{uid}  int     본인만 +1씩
 막혔을 때 빠져나오는 유일한 길. **침묵을 동의로 친다** — 그래서 탭만 켜두고 자리를 비운 사람이 방을 잠그지 못한다.
 
 **요청**: `phase==='play'`이고 `swap`이 없고 `now >= swapCool`일 때, 누구나 트랜잭션으로
-`swap = {by: uid, round: 현재 라운드, until: now + 20000}`. 요청자는 자기 `presence/{uid}/vote = {round, ok:true}`도 같이 쓴다(자동 찬성).
+`swap = {by: uid, round: 현재 라운드, until: now + 20000}`. 요청자는 자기 `presence/{uid}/vote = {req: swap.until, ok:true}`도 같이 쓴다(자동 찬성).
 
-**투표**: 나머지는 `👍 동의` / `👎 거부` → 자기 `presence/{uid}/vote = {round, ok}`.
+**투표**: 나머지는 `👍 동의` / `👎 거부` → 자기 `presence/{uid}/vote = {req: swap.until, ok}`.
 
 **집계** (호스트가 `presence` + `meta` 변화마다 재평가):
 ```
-유효표 = presence 중 vote.round === meta.round 인 것
+if (swap.round !== meta.round)   → stale: swap=null  (라운드가 넘어간 요청)
+유효표 = presence 중 vote.req === swap.until 인 것
 
 if (거부 하나라도 있음)          → 취소: swap=null, swapCool = now + 30000
 else if (찬성 수 === 접속자 수)   → 즉시 교체
@@ -218,7 +222,7 @@ else                             → 대기
 **교체 동작** (`phase`는 `play` 유지, `round`도 **그대로** — 아직 아무도 못 이긴 라운드니까):
 - chain: **새 시드로 체인 재시작.** `chain=[seed]`, `used={seed}`, `need=last(seed)`. 이어온 체인은 버린다 — 아무도 못 잇는 글자에서 빠져나오는 유일한 길이다.
 - chosung: 새 `pattern` (이번 게임에서 쓴 패턴 제외)
-- 공통: `swap=null`, `startedAt=now`, 모든 `vote`는 `round`가 안 바뀌었으므로 **호스트가 직접 지운다**(교체 후 표가 남아 있으면 안 되므로 — 라운드 자동 무효화가 안 먹는 유일한 경우)
+- 공통: `swap=null`, `startedAt=now`. **표는 지우지 않는다** — 다음 요청은 `until`이 달라서 옛 표가 `req` 불일치로 자동 무효가 된다.
 
 **거부 후**: 30초 쿨다운(`swapCool`). 그동안 요청 버튼 비활성 + 🦉 `방금 거부됐어. 조금만 더 생각해보자!`. 지나면 다시 요청 가능.
 
@@ -256,7 +260,8 @@ else                             → 대기
 | 로컬 검증 실패 | 기존 혼자하기와 같은 문구로 재시도 (게임오버 아님) |
 | 위키 폴백 타임아웃 | 사전에 없는 것으로 처리, 재시도 피드백 |
 | 혼자만 접속 | 정상 동작 — 내가 호스트, 모든 라운드 내가 이김. 교체 요청은 즉시 통과 |
-| 교체 투표 중 라운드가 넘어감 | `vote.round` 불일치로 표가 저절로 무효. `swap`은 호스트가 정리 |
+| 교체 투표 중 라운드가 넘어감 | 호스트가 `swap.round !== round`를 보고 `swap`을 정리. 표는 `req` 불일치로 저절로 무효 |
+| 같은 라운드에서 교체가 두 번 | 두 번째 요청은 `until`이 달라 첫 요청의 표가 안 딸려온다. 다시 투표해야 통과 |
 | 교체 투표 중 요청자가 나감 | 남은 표로 그대로 집계 — 요청자 존재는 조건이 아님 |
 | 모두 나가고 방이 빈 채로 남음 | `meta`는 남지만 무해. 다음 입장자가 호스트가 되어 그 라운드부터 이어감 |
 
