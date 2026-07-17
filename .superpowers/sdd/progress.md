@@ -25,3 +25,10 @@ Task 3: complete (commit 8bb143e, review clean)
   - CORE에 pickHost/swapOutcome 추가, CORE_NAMES 등록. 테스트 60/60 (기존 53 + 신규 7)
   - 리뷰어가 precedence 손으로 추적해 확인: stale > cancel > 만장일치 > 타임아웃
   - Minor(미해결): memberCount===0이면 즉시 'swap' 반환(빈 방). 요청자가 항상 멤버라 실제로 안 걸림.
+Task 4: complete (commits e7a7b8f..bba0228, review clean + 브라우저 스모크 8/8)
+  - #modepick-overlay 신설. chain/chosung만 분기, choice/type은 직행.
+  - 기존 테스트 2개(끝말잇기/초성 배선)는 옛 핸들러 문자열을 하드코딩하고 있어 수정 불가피.
+    리뷰어가 독립 검증: 치환 문자열이 유일하고 솔로 도달을 여전히 못 박음.
+  - puppeteer 앞당겨 설치(Task 9 Step 1). 이후 태스크는 실제 브라우저로 검증 가능.
+  - 스모크 확인: 오버레이 열림/닫힘, 솔로 실제 한 턴 플레이해 점수 증가, 다른낱말/힌트/최고기록 살아있음,
+    choice는 오버레이 없이 직행, 같이하기는 stub alert. 콘솔 에러 0.
