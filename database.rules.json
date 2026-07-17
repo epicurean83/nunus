@@ -22,6 +22,14 @@
           "deadline":   { ".validate": "newData.isNumber()" },
           "chain":      { ".validate": "newData.hasChildren() || newData.val() == null" },
           "used":       { ".validate": "newData.hasChildren() || newData.val() == null" },
+          "swap": {
+            ".validate": "newData.hasChildren(['by','round','until']) || !newData.exists()",
+            "by":    { ".validate": "newData.isString() && newData.val().length <= 64" },
+            "round": { ".validate": "newData.isNumber()" },
+            "until": { ".validate": "newData.isNumber()" },
+            "$o":    { ".validate": false }
+          },
+          "swapCool": { ".validate": "newData.isNumber()" },
           "$other":     { ".validate": false }
         },
 
@@ -31,6 +39,12 @@
             ".validate": "newData.hasChildren(['name','ts'])",
             "name": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 24" },
             "ts":   { ".validate": "newData.isNumber()" },
+            "vote": {
+              ".validate": "newData.hasChildren(['req','ok']) || !newData.exists()",
+              "req": { ".validate": "newData.isNumber()" },
+              "ok":  { ".validate": "newData.isBoolean()" },
+              "$o":  { ".validate": false }
+            },
             "$o":   { ".validate": false }
           }
         },
