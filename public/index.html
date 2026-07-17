@@ -1655,7 +1655,9 @@ function enterRoom(){
   });
   MG.subs.push(()=> MG.ref.child('scores').off('value', onScores));
 
-  const tick = setInterval(()=>{ if(MG && MG.meta && MG.meta.swap) renderSwapUI(); }, 1000);
+  const tick = setInterval(()=>{
+    if(MG && MG.meta && (MG.meta.swap || MG.meta.swapCool)) renderSwapUI();
+  }, 1000);
   MG.subs.push(()=> clearInterval(tick));
 
   // 연결 끊김: 끊기면 입력을 잠그고 알린다. 복구되면 presence를 다시 심고 재개한다.
@@ -1668,6 +1670,7 @@ function enterRoom(){
       mSay('연결이 끊겼어! 다시 연결 중…');
       $('multi-input').disabled = true;
       $('multi-submit').disabled = true;
+      $('multi-swap').innerHTML = '';
     }else{
       const me2 = MG.ref.child('presence/' + MG.uid);
       me2.onDisconnect().remove();
@@ -1984,6 +1987,7 @@ function renderSwapUI(){
 
 function leaveMulti(){
   if(hostTimer){ clearTimeout(hostTimer); hostTimer = null; }
+  if(swapTimer){ clearTimeout(swapTimer); swapTimer = null; }
   if(MG){
     MG.subs.forEach(off=>{ try{ off(); }catch(e){} });
     if(MG.ref && MG.uid) MG.ref.child('presence/' + MG.uid).remove();
