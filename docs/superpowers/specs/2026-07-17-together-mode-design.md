@@ -13,7 +13,7 @@
 1. **모드 완전 분리.** 게임 카드를 누르면 `혼자 하기` / `같이 하기` 선택. 혼자하기 코드 경로 무변경.
 2. **혼자하기는 현행 유지** — 최고 기록, `🔄 다른 낱말`, `💡 힌트` 전부 그대로.
 3. **같이하기는 신설 화면 1개**(`screen-multi`)를 두 게임이 공용. 문제 영역만 교체.
-4. 같이하기: 최고 기록 없음, `🔄 다른 낱말` 없음, `💡 힌트`는 **나에게만** 표시.
+4. 같이하기: 최고 기록 없음, `🔄 다른 낱말` 없음, **`💡 힌트` 없음** — 순수 실력 레이스. (혼자하기에는 셋 다 그대로 남는다.)
 5. 닉네임은 **같이하기 첫 진입 때만** 🦉가 묻고 기기 저장. 혼자만 하는 사용자는 끝까지 안 물어봄.
 6. 상시 공용방 1개/게임. 입장 = 참가. **1게임 = 10라운드**, 라운드마다 같은 문제, **선착순 1명 +1점**.
 7. 라운드 승패는 **🦉 말풍선이 중계**. 별도 오버레이 없음. 3초 후 자동 다음 라운드.
@@ -61,8 +61,7 @@ data-mode==='chain'|'chosung'  → openModePick(mode)   // 신설
 │   chosung → .chosung-pattern + 안내문       │
 │                                            │
 │ [#multi-input          ] [#multi-submit]   │
-│ #multi-hint            ← 나만 보임          │
-│ [💡 힌트 #multi-hint-btn]                   │
+│ #multi-feedback        ← 재시도 안내(나만)   │
 │                                            │
 │ #multi-endbox (hidden) — 최종순위 + 다시 시작│
 └────────────────────────────────────────────┘
@@ -84,9 +83,10 @@ data-mode==='chain'|'chosung'  → openModePick(mode)   // 신설
 | `chainCheck(prev, input, used, dict)` | 끝말잇기 답 검증 |
 | `chosungOf(word)` | 초성 패턴 대조 |
 | `hasContinuation(need, words, used)` | 워치독: 이어질 낱말 존재 여부 |
-| `findHint(need, words, used)` | 워치독이 채울 답 / 힌트 |
-| `hintDisplay(word, step)`, `chosungHint(word, step)` | 💡 힌트 단계 |
+| `findHint(need, words, used)` | 워치독이 채울 답 (💡 힌트 버튼과 무관 — 같이하기엔 힌트 없음) |
 | `norm`, `shuffle`, `isHangulSyllable`, `SEED_WORDS` | 공용 |
+
+`hintDisplay` / `chosungHint`(💡 힌트 단계)는 혼자하기 전용이라 같이하기에서 쓰지 않는다.
 
 CORE 밖 재사용: `WORD_ALL` / `WORD_SET`(words.v1.txt 로드분 포함), `chosungIndex()` → `{map, easy}`(초성 20개↑ 패턴 풀), 위키 폴백 검증.
 
