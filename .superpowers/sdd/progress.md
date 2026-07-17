@@ -11,3 +11,8 @@ Branch: feature/multiplayer   merge-base(main): 10fad8c
 
 ## 태스크
 (완료되면 여기에 한 줄씩 추가)
+Task 1: complete (commits 1e94b01..3337e88, review clean)
+  - node v24.18.0 via nvm (~/.nvm). 매 셸에서 소스 필요:
+      export NVM_DIR="$HOME/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+  - 테스트 명령: `node --test test/logic.test.mjs` (계획의 `node --test test/`는 Node24에서 깨짐 → 계획 17곳 수정)
+  - 기준선 53/53 통과. 루트 index.html 삭제됨, public/index.html이 유일본.
