@@ -61,7 +61,7 @@ Expected: `v22.x.x` 같은 버전 출력.
 ```bash
 cd /home/epicurean/homespace/nunus
 export NVM_DIR="$HOME/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-node --test test/
+node --test test/logic.test.mjs
 ```
 Expected: PASS. **여기서 실패하면 멈추고 보고할 것** — 기준선이 깨진 상태에서 진행하면 이후 실패의 원인을 알 수 없다.
 
@@ -88,7 +88,7 @@ if(start < 0 || end < 0) throw new Error('CORE markers not found in public/index
 - [ ] **Step 5: 테스트 재실행 — 루트 삭제 전에 public/ 기준으로 통과 확인**
 
 ```bash
-node --test test/
+node --test test/logic.test.mjs
 ```
 Expected: PASS (Step 2와 동일한 결과). 두 파일이 identical이므로 결과가 같아야 정상.
 
@@ -101,7 +101,7 @@ git rm index.html
 - [ ] **Step 7: 삭제 후에도 테스트 통과 확인**
 
 ```bash
-node --test test/
+node --test test/logic.test.mjs
 ```
 Expected: PASS. 이제 `public/index.html`만 읽으므로 루트가 없어도 통과해야 한다.
 
@@ -361,7 +361,7 @@ test('swapOutcome: 지난 요청의 표는 새 요청에 안 딸려온다', () =
 ```bash
 cd /home/epicurean/homespace/nunus
 export NVM_DIR="$HOME/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-node --test test/
+node --test test/logic.test.mjs
 ```
 Expected: FAIL — `pickHost is not defined` 계열. (`loadCore`가 `typeof` 가드로 `undefined`를 반환하므로 `pickHost(...)` 호출에서 "is not a function"으로 뜰 수도 있다. 둘 다 정상적인 실패다.)
 
@@ -393,7 +393,7 @@ function swapOutcome(swap, votes, memberCount, now, round){
 - [ ] **Step 4: 통과 확인**
 
 ```bash
-node --test test/
+node --test test/logic.test.mjs
 ```
 Expected: PASS (신규 7개 포함 전부).
 
@@ -454,7 +454,7 @@ test('public/index.html: 모드 선택 오버레이 배선', () => {
 - [ ] **Step 2: 실패 확인**
 
 ```bash
-node --test test/
+node --test test/logic.test.mjs
 ```
 Expected: FAIL — `모드 선택 오버레이가 있어야`
 
@@ -523,7 +523,7 @@ function startMulti(mode){ alert('같이 하기는 아직 준비 중이야! (' +
 - [ ] **Step 7: 통과 확인**
 
 ```bash
-node --test test/
+node --test test/logic.test.mjs
 ```
 Expected: PASS
 
@@ -606,7 +606,7 @@ test('public/index.html: 같이하기에는 힌트/다른낱말 버튼이 없다
 - [ ] **Step 2: 실패 확인**
 
 ```bash
-node --test test/
+node --test test/logic.test.mjs
 ```
 Expected: FAIL — `screen-multi가 있어야`
 
@@ -861,7 +861,7 @@ $('multi-home2').addEventListener('click', leaveMulti);
 - [ ] **Step 9: 통과 확인**
 
 ```bash
-node --test test/
+node --test test/logic.test.mjs
 ```
 Expected: PASS
 
@@ -934,7 +934,7 @@ test('public/index.html: 같이하기 문제 출제/구독 배선', () => {
 - [ ] **Step 2: 실패 확인**
 
 ```bash
-node --test test/
+node --test test/logic.test.mjs
 ```
 Expected: FAIL — `newProblem이 있어야`
 
@@ -1027,7 +1027,7 @@ function renderSwapUI(){ /* Task 8에서 채운다 */ }
 - [ ] **Step 5: 통과 확인**
 
 ```bash
-node --test test/
+node --test test/logic.test.mjs
 ```
 Expected: PASS
 
@@ -1098,7 +1098,7 @@ test('public/index.html: 같이하기 승부/점수 배선', () => {
 - [ ] **Step 2: 실패 확인**
 
 ```bash
-node --test test/
+node --test test/logic.test.mjs
 ```
 Expected: FAIL — `submitMulti가 있어야`
 
@@ -1251,7 +1251,7 @@ $('multi-restart').addEventListener('click', restartMulti);
 - [ ] **Step 7: 통과 확인**
 
 ```bash
-node --test test/
+node --test test/logic.test.mjs
 ```
 Expected: PASS
 
@@ -1308,7 +1308,7 @@ test('public/index.html: 문제 교체 요청 배선', () => {
 - [ ] **Step 2: 실패 확인**
 
 ```bash
-node --test test/
+node --test test/logic.test.mjs
 ```
 Expected: FAIL — `askSwap이 있어야`
 
@@ -1434,7 +1434,7 @@ function renderSwapUI(){
 - [ ] **Step 5: 통과 확인**
 
 ```bash
-node --test test/
+node --test test/logic.test.mjs
 ```
 Expected: PASS
 
@@ -1601,7 +1601,7 @@ Expected: `null`
 - [ ] **Step 6: 전체 회귀 재확인**
 
 ```bash
-node --test test/
+node --test test/logic.test.mjs
 ```
 Expected: PASS — 혼자하기 무손상 최종 확인.
 
@@ -1653,7 +1653,7 @@ Expected: `Deploy complete!`
 
 | 무엇을 | 어떻게 | 어느 태스크 |
 |---|---|---|
-| 혼자하기 무손상 | `node --test test/` (기존 스위트 전부) | 1, 매 태스크 |
+| 혼자하기 무손상 | `node --test test/logic.test.mjs` (기존 스위트 전부) | 1, 매 태스크 |
 | 교체 투표 집계 | CORE 단위 테스트 7개 | 3 |
 | 표 위조 차단 | `bash test/rules-check.sh` — 남의 vote 쓰기 401 | 2 |
 | 동시 제출 → 승자 1명 | `node test/multi-race.mjs` | 9 |
