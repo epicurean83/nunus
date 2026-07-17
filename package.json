@@ -1,0 +1,28 @@
+{
+  "name": "nunus",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/epicurean83/nunus.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/epicurean83/nunus/issues"
+  },
+  "homepage": "https://github.com/epicurean83/nunus#readme",
+  "devDependencies": {
+    "puppeteer": "^25.3.0"
+  }
+}
