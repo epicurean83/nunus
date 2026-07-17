@@ -502,6 +502,16 @@
     </div>
   </section>
 
+  <!-- ============ 모드 선택 (혼자 / 같이) ============ -->
+  <div id="modepick-overlay" class="overlay hidden">
+    <div class="overlay-card">
+      <div class="overlay-title" id="modepick-title"></div>
+      <button class="btn btn-soft" id="modepick-solo">👤 혼자 하기</button>
+      <button class="btn btn-primary" id="modepick-multi">👥 같이 하기</button>
+      <button class="ghostbtn" id="modepick-close">닫기</button>
+    </div>
+  </div>
+
   <!-- ============ RECORD OVERLAY ============ -->
   <div id="chain-record-overlay" class="overlay hidden">
     <div class="overlay-card">
@@ -1465,9 +1475,20 @@ function endChosung(){
 }
 function leaveChosung(){ finalizeChoBest(); show('home'); }
 
+/* ---------- 모드 선택 (혼자 / 같이) ---------- */
+let modePickMode = null;
+const MODE_LABEL = { chain:'🔤 끝말잇기', chosung:'🔡 초성게임' };
+function openModePick(mode){
+  modePickMode = mode;
+  $('modepick-title').textContent = MODE_LABEL[mode] || '';
+  $('modepick-overlay').classList.remove('hidden');
+}
+function closeModePick(){ $('modepick-overlay').classList.add('hidden'); }
+function startMulti(mode){ alert('같이 하기는 아직 준비 중이야! (' + mode + ')'); }
+
 /* ================= 이벤트 바인딩 ================= */
 document.querySelectorAll('.mode-card').forEach(c=>{
-  c.addEventListener('click', ()=>{ const m=c.dataset.mode; if(m==='chain') startChain(); else if(m==='chosung') startChosung(); else startQuiz(m); });
+  c.addEventListener('click', ()=>{ const m=c.dataset.mode; if(m==='chain'||m==='chosung') openModePick(m); else startQuiz(m); });
 });
 $('btn-home').addEventListener('click', ()=>show('home'));
 $('btn-home2').addEventListener('click', ()=>show('home'));
@@ -1519,6 +1540,16 @@ $('chosung-home2').addEventListener('click', leaveChosung);
 $('chain-record-btn').addEventListener('click', openRecord);
 $('record-close').addEventListener('click', closeRecord);
 $('chain-record-overlay').addEventListener('click', e=>{ if(e.target === $('chain-record-overlay')) closeRecord(); });
+$('modepick-solo').addEventListener('click', ()=>{
+  closeModePick();
+  if(modePickMode==='chain') startChain(); else startChosung();
+});
+$('modepick-multi').addEventListener('click', ()=>{
+  closeModePick();
+  startMulti(modePickMode);
+});
+$('modepick-close').addEventListener('click', closeModePick);
+$('modepick-overlay').addEventListener('click', e=>{ if(e.target === $('modepick-overlay')) closeModePick(); });
 
 /* ================= 시작 ================= */
 initTheme();

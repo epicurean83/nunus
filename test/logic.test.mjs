@@ -321,7 +321,8 @@ test('index.html: 끝말잇기 화면/배선', () => {
   assert.ok(html.includes("chain:$('screen-chain')"));
   assert.ok(html.includes('function startChain'));
   assert.ok(html.includes('function submitChain'));
-  assert.ok(html.includes("if(m==='chain') startChain()"));
+  assert.ok(html.includes("if(m==='chain'||m==='chosung') openModePick(m)"));
+  assert.ok(html.includes("if(modePickMode==='chain') startChain()"));
   assert.ok(html.includes('nachmal.chain.best.v1'));
 });
 test('index.html: 최고 기록 체인 보기', () => {
@@ -413,7 +414,8 @@ test('index.html: 초성게임 배선', () => {
   assert.ok(html.includes("chosung:$('screen-chosung')"));
   assert.ok(html.includes('function startChosung'));
   assert.ok(html.includes('function submitChosung'));
-  assert.ok(html.includes("if(m==='chosung') startChosung()"));
+  assert.ok(html.includes("if(m==='chain'||m==='chosung') openModePick(m)"));
+  assert.ok(html.includes('else startChosung()'));
   assert.ok(html.includes('nachmal.chosung.best.v1'));
 });
 
@@ -470,4 +472,18 @@ test('swapOutcome: 지난 요청의 표는 새 요청에 안 딸려온다', () =
   assert.equal(swapOutcome(swap2, old, 3, 1000, 5), 'wait');
   // 요청자 본인 표(새 req)만 있으면 여전히 대기
   assert.equal(swapOutcome(swap2, [{req:8888,ok:true}], 3, 1000, 5), 'wait');
+});
+
+test('public/index.html: 모드 선택 오버레이 배선', () => {
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  assert.match(html, /id="modepick-overlay"/, '모드 선택 오버레이가 있어야');
+  assert.match(html, /id="modepick-solo"/, '혼자 하기 버튼이 있어야');
+  assert.match(html, /id="modepick-multi"/, '같이 하기 버튼이 있어야');
+  assert.match(html, /function openModePick\(/, 'openModePick이 있어야');
+  // 카드 클릭이 곧바로 startChain/startChosung을 부르지 않고 갈림길을 거쳐야
+  assert.match(html, /dataset\.mode[\s\S]{0,200}openModePick\(/,
+    '모드카드 클릭은 openModePick을 거쳐야');
+  // 혼자하기 진입점은 살아 있어야
+  assert.match(html, /function startChain\(/, 'startChain은 그대로 남아야');
+  assert.match(html, /function startChosung\(/, 'startChosung은 그대로 남아야');
 });
