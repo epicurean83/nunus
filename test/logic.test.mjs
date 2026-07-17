@@ -507,3 +507,13 @@ test('public/index.html: 같이하기에는 힌트/다른낱말 버튼이 없다
   assert.doesNotMatch(m[0], /multi-hint-btn/, '같이하기엔 힌트 버튼이 없어야');
   assert.doesNotMatch(m[0], /다른 낱말/, '같이하기엔 다른 낱말 버튼이 없어야');
 });
+
+test('public/index.html: 같이하기 문제 출제/구독 배선', () => {
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  assert.match(html, /function newProblem\(/, 'newProblem이 있어야');
+  assert.match(html, /function bootstrapMeta\(/, 'bootstrapMeta가 있어야');
+  assert.match(html, /function renderMulti\(/, 'renderMulti가 있어야');
+  assert.match(html, /\.child\('meta'\)[\s\S]{0,80}\.on\('value'/, 'meta를 구독해야');
+  // 정답을 DB에 올리면 안 된다: 출제 시 answer를 쓰지 않는지
+  assert.doesNotMatch(html, /newProblem[\s\S]{0,400}answer:/, '출제 때 answer를 쓰면 안 됨');
+});
