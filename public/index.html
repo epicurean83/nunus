@@ -1620,6 +1620,7 @@ function submitNick(){
 }
 
 function enterRoom(){
+  const myRef = MG.ref;
   const me = MG.ref.child('presence/' + MG.uid);
   me.onDisconnect().remove();
   me.set({ name: MG.name, ts: firebase.database.ServerValue.TIMESTAMP });
@@ -1627,6 +1628,7 @@ function enterRoom(){
   mSay('들어왔다! 잠깐만…');
 
   const onPresence = MG.ref.child('presence').on('value', snap=>{
+    if(!MG || MG.ref !== myRef) return;
     const v = snap.val() || {};
     MG.members = Object.keys(v).map(uid => ({ uid, ...v[uid] }));
     MG.hostUid = pickHost(MG.members.map(m=>m.uid));
@@ -1638,7 +1640,7 @@ function enterRoom(){
   // (onDisconnect().remove()가 서버에서 우리를 지웠을 수 있으므로 set을 다시 해야 한다.)
   const conRef = firebase.database().ref('.info/connected');
   const onCon = conRef.on('value', s=>{
-    if(!MG) return;
+    if(!MG || MG.ref !== myRef) return;
     MG.online = !!s.val();
     if(!MG.online){
       mSay('연결이 끊겼어! 다시 연결 중…');
