@@ -1585,7 +1585,7 @@ function fbInit(){
 }
 
 function startMulti(mode){
-  MG = { mode, uid:null, name:loadNick(), ref:null, members:[], meta:null, hostUid:null, subs:[] };
+  MG = { mode, uid:null, name:loadNick(), ref:null, members:[], meta:null, hostUid:null, subs:[], allScores:{}, scoreCache:{} };
   $('multi-title').textContent = (MODE_LABEL[mode]||'') + ' · 같이';
   $('multi-problem-chain').classList.toggle('hidden', mode!=='chain');
   $('multi-problem-chosung').classList.toggle('hidden', mode!=='chosung');
@@ -1633,6 +1633,7 @@ function enterRoom(){
     MG.members = Object.keys(v).map(uid => ({ uid, ...v[uid] }));
     MG.hostUid = pickHost(MG.members.map(m=>m.uid));
     renderPlayers();
+    renderMulti();          // 호스트가 바뀌었을 수 있으니 새 호스트가 진행을 재평가한다
     if(!MG.meta) bootstrapMeta();
   });
   MG.subs.push(()=> MG.ref.child('presence').off('value', onPresence));
@@ -1641,15 +1642,15 @@ function enterRoom(){
     if(!MG || MG.ref !== myRef) return;
     MG.meta = snap.val();
     if(!MG.meta) bootstrapMeta();
+    refreshScores();
     renderMulti();
   });
   MG.subs.push(()=> MG.ref.child('meta').off('value', onMeta));
 
   const onScores = MG.ref.child('scores').on('value', snap=>{
     if(!MG || MG.ref !== myRef) return;
-    const all = snap.val() || {};
-    MG.scoreCache = (MG.meta && all[MG.meta.gameId]) || {};
-    renderPlayers();
+    MG.allScores = snap.val() || {};
+    refreshScores();
     if(MG.meta && MG.meta.phase === 'over') renderMulti();
   });
   MG.subs.push(()=> MG.ref.child('scores').off('value', onScores));
@@ -1689,6 +1690,14 @@ function renderPlayers(){
 }
 function escapeHtml(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
 
+// meta와 scores 두 리스너 모두 이 한 곳에서 scoreCache를 도출한다(리스타트 후 캐시가
+// 이전 게임 점수로 남는 것을 막는다 — 리스타트는 scores에 아무것도 쓰지 않는다).
+function refreshScores(){
+  if(!MG) return;
+  MG.scoreCache = (MG.meta && MG.allScores && MG.allScores[MG.meta.gameId]) || {};
+  renderPlayers();
+}
+
 /* ---------- 같이하기: 출제 · meta · 렌더 ---------- */
 // 새 문제 조각을 만든다. 정답은 절대 넣지 않는다(DB에 올라가므로).
 function newProblem(mode, meta){
@@ -1719,7 +1728,7 @@ function bootstrapMeta(){
       gameId: 1, round: 1, phase: 'play',
       startedAt: firebase.database.ServerValue.TIMESTAMP
     }, p);
-  });
+  }, undefined, false);
 }
 
 function renderMulti(){
@@ -1803,13 +1812,15 @@ function submitMulti(){
     return;
   }
 
-  const myName = MG.name, myUid = MG.uid, mode = MG.mode;
-  MG.ref.child('meta').transaction(cur=>{
+  const myName = MG.name, myUid = MG.uid, mode = MG.mode, myRef = MG.ref;
+  myRef.child('meta').transaction(cur=>{
     if(!cur || cur.phase !== 'play' || cur.winner) return;      // 남이 먼저 → abort
     if(mode === 'chain'){
       if([...word][0] !== cur.need) return;
       if(cur.used && cur.used[word]) return;
-      cur.chain = cur.chain || []; cur.chain.push(word);
+      const arr = cur.chain ? Object.values(cur.chain) : [];
+      arr.push(word);
+      cur.chain = arr;
       cur.used = cur.used || {}; cur.used[word] = true;
       cur.need = [...word].pop();
     }else{
@@ -1819,12 +1830,14 @@ function submitMulti(){
     cur.winner = myUid; cur.winnerName = myName; cur.answer = word; cur.phase = 'reveal';
     cur.swap = null;
     return cur;
-  }, (err, committed)=>{
+  }, (err, committed, snap)=>{
     $('multi-input').value = '';
     if(err || !committed) return;                                // 졌으면 조용히
-    MG.ref.child('scores/' + MG.meta.gameId + '/' + myUid)
-      .transaction(s => (s||0) + 1);
-  });
+    if(!MG || MG.ref !== myRef) return;                           // 세션이 바뀌었으면 손대지 않음
+    const s = snap && snap.val();
+    if(!s) return;
+    myRef.child('scores/' + s.gameId + '/' + myUid).transaction(v => (v||0) + 1);
+  }, false);
 }
 
 // 호스트만: reveal 3초 후 다음 라운드 / 10라운드 후 종료
@@ -1845,24 +1858,25 @@ function hostTick(){
       cur.startedAt = Date.now(); cur.swap = null;
       if(MG.mode === 'chosung') Object.assign(cur, newProblem('chosung', cur));
       return cur;                                                // chain은 need가 이미 이어짐
-    });
+    }, undefined, false);
   }, REVEAL_MS);
 }
 
 function restartMulti(){
   MG.ref.child('meta').transaction(cur=>{
-    if(!cur) return;
+    if(!cur || cur.phase !== 'over') return;         // 'over' 화면에서 두 명이 동시에 눌러도 한 번만 진행
     const p = newProblem(MG.mode, null);
     return Object.assign({
       gameId: (cur.gameId||1) + 1, round: 1, phase: 'play',
       startedAt: Date.now()
     }, p);
-  });
+  }, undefined, false);
 }
 
 function renderSwapUI(){ /* Task 8에서 채운다 */ }
 
 function leaveMulti(){
+  if(hostTimer){ clearTimeout(hostTimer); hostTimer = null; }
   if(MG){
     MG.subs.forEach(off=>{ try{ off(); }catch(e){} });
     if(MG.ref && MG.uid) MG.ref.child('presence/' + MG.uid).remove();
