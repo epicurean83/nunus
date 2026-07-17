@@ -527,3 +527,15 @@ test('public/index.html: 같이하기 승부/점수 배선', () => {
   assert.match(html, /scores\/'\s*\+\s*[\s\S]{0,60}gameId/, '점수는 gameId로 키잉해야');
   assert.match(html, /MULTI_ROUNDS/, '라운드 상한을 써야');
 });
+
+test('public/index.html: 문제 교체 요청 배선', () => {
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  assert.match(html, /function askSwap\(/, 'askSwap이 있어야');
+  assert.match(html, /function voteSwap\(/, 'voteSwap이 있어야');
+  assert.match(html, /function tallySwap\(/, 'tallySwap이 있어야');
+  assert.match(html, /swapOutcome\(/, 'CORE의 swapOutcome을 써야');
+  assert.match(html, /SWAP_VOTE_MS/, '투표 마감 상수를 써야');
+  assert.match(html, /SWAP_COOL_MS/, '거부 쿨다운 상수를 써야');
+  // 표는 presence 아래에만
+  assert.match(html, /presence\/'\s*\+\s*MG\.uid\s*\+\s*'\/vote/, '표는 내 presence 아래에 써야');
+});

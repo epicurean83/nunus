@@ -1655,6 +1655,9 @@ function enterRoom(){
   });
   MG.subs.push(()=> MG.ref.child('scores').off('value', onScores));
 
+  const tick = setInterval(()=>{ if(MG && MG.meta && MG.meta.swap) renderSwapUI(); }, 1000);
+  MG.subs.push(()=> clearInterval(tick));
+
   // 연결 끊김: 끊기면 입력을 잠그고 알린다. 복구되면 presence를 다시 심고 재개한다.
   // (onDisconnect().remove()가 서버에서 우리를 지웠을 수 있으므로 set을 다시 해야 한다.)
   const conRef = firebase.database().ref('.info/connected');
@@ -1873,7 +1876,111 @@ function restartMulti(){
   }, undefined, false);
 }
 
-function renderSwapUI(){ /* Task 8에서 채운다 */ }
+/* ---------- 같이하기: 문제 교체 요청 ---------- */
+function myVote(){
+  const me = MG.members.find(x=>x.uid===MG.uid);
+  return me && me.vote ? me.vote : null;
+}
+function askSwap(){
+  const m = MG.meta; if(!m || m.phase!=='play') return;
+  if(m.swapCool && Date.now() < m.swapCool) return;
+  // 요청을 먼저 확정하고, 확정된 until을 req로 삼아 자동 찬성표를 던진다.
+  MG.ref.child('meta').transaction(cur=>{
+    if(!cur || cur.phase!=='play' || cur.swap) return;
+    if(cur.swapCool && Date.now() < cur.swapCool) return;
+    cur.swap = { by: MG.uid, round: cur.round, until: Date.now() + SWAP_VOTE_MS };
+    return cur;
+  }, (err, committed, snap)=>{
+    if(err || !committed) return;
+    const s = snap.val();
+    if(s && s.swap) MG.ref.child('presence/' + MG.uid + '/vote')
+                          .set({ req: s.swap.until, ok: true });
+  }, false);
+}
+function voteSwap(ok){
+  const m = MG.meta; if(!m || !m.swap) return;
+  MG.ref.child('presence/' + MG.uid + '/vote').set({ req: m.swap.until, ok: !!ok });
+}
+
+// 호스트만 집계·확정한다. presence/meta가 바뀔 때마다 재평가 + 마감용 타이머 1개.
+let swapTimer = null;
+function tallySwap(){
+  if(!MG || !isHost() || !MG.meta) return;
+  const m = MG.meta;
+  const votes = MG.members.map(x=>x.vote).filter(Boolean);
+  const out = swapOutcome(m.swap, votes, MG.members.length, Date.now(), m.round);
+
+  if(out === 'wait'){
+    if(!swapTimer){
+      const ms = Math.max(250, (m.swap.until - Date.now()) + 250);
+      swapTimer = setTimeout(()=>{ swapTimer = null; tallySwap(); }, ms);
+    }
+    return;
+  }
+  if(swapTimer){ clearTimeout(swapTimer); swapTimer = null; }
+
+  if(out === 'cancel'){
+    MG.ref.child('meta').update({ swap: null, swapCool: Date.now() + SWAP_COOL_MS });
+    return;
+  }
+  if(out === 'swap'){
+    MG.ref.child('meta').transaction(cur=>{
+      if(!cur || !cur.swap || cur.swap.round !== cur.round) return;
+      // 버린 패턴도 used에 넣는다 — 안 그러면 바로 다시 뽑혀 나올 수 있다
+      if(MG.mode === 'chosung' && cur.pattern){
+        cur.used = cur.used || {}; cur.used[cur.pattern] = true;
+      }
+      Object.assign(cur, newProblem(MG.mode, cur));
+      cur.swap = null; cur.startedAt = Date.now();
+      return cur;
+    }, undefined, false);
+    return;
+  }
+  if(out === 'stale'){ MG.ref.child('meta').update({ swap: null }); }
+}
+// 표를 지우는 함수는 없다. 표는 req(=그 요청의 until)로 묶여 있어서 다음 요청에는
+// 애초에 안 딸려온다. 게다가 규칙상 남의 표는 지울 수도 없다.
+
+function renderSwapUI(){
+  const el = $('multi-swap'); if(!el) return;
+  const m = MG && MG.meta;
+  if(!m || m.phase !== 'play'){ el.innerHTML = ''; return; }
+
+  const mv = myVote();
+  const now = Date.now();
+  if(!m.swap){
+    if(m.swapCool && now < m.swapCool){
+      el.innerHTML = '<button class="btn btn-soft" disabled>🔄 문제 교체 요청</button>';
+      mSay('방금 거부됐어. 조금만 더 생각해보자!');
+    }else{
+      el.innerHTML = '<button class="btn btn-soft" id="multi-swap-ask">🔄 문제 교체 요청</button>';
+      $('multi-swap-ask').addEventListener('click', askSwap);
+    }
+    tallySwap();
+    return;
+  }
+
+  const votes = MG.members.map(x=>x.vote).filter(v=>v && v.req===m.swap.until);
+  const yes = votes.filter(v=>v.ok===true).length;
+  const left = Math.max(0, Math.ceil((m.swap.until - now)/1000));
+  const tally = '동의 ' + yes + '/' + MG.members.length + ' · ' + left + '초';
+
+  if(m.swap.by === MG.uid){
+    el.innerHTML = '<span class="chain-hint">' + tally + '</span>';
+    mSay('교체 요청했어! 다들 괜찮으면 ' + Math.ceil(SWAP_VOTE_MS/1000) + '초 뒤 바뀐다');
+  }else if(mv && mv.req === m.swap.until){
+    el.innerHTML = '<span class="chain-hint">' + (mv.ok ? '👍 동의함' : '👎 거부함') + ' · ' + tally + '</span>';
+  }else{
+    el.innerHTML = '<button class="btn btn-soft" id="multi-swap-yes">👍 동의</button>' +
+                   '<button class="btn btn-soft" id="multi-swap-no">👎 거부</button>' +
+                   '<span class="chain-hint">' + tally + '</span>';
+    $('multi-swap-yes').addEventListener('click', ()=>voteSwap(true));
+    $('multi-swap-no').addEventListener('click', ()=>voteSwap(false));
+    const who = (MG.members.find(x=>x.uid===m.swap.by)||{}).name || '누군가';
+    mSay(escapeHtml(who) + '가 문제를 바꾸재. 싫으면 ' + left + '초 안에 거부해!');
+  }
+  tallySwap();
+}
 
 function leaveMulti(){
   if(hostTimer){ clearTimeout(hostTimer); hostTimer = null; }
