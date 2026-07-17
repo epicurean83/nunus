@@ -12,10 +12,10 @@ const CORE_NAMES = [
 ];
 
 function loadCore(){
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   const start = html.indexOf('/* CORE:START */');
   const end = html.indexOf('/* CORE:END */');
-  if(start < 0 || end < 0) throw new Error('CORE markers not found in index.html');
+  if(start < 0 || end < 0) throw new Error('CORE markers not found in public/index.html');
   const core = html.slice(start, end);
   // Math.random을 결정적으로 주입(오답 셔플 테스트 재현성)
   const seedMath = Object.assign(Object.create(Math), { random: () => 0 });
@@ -156,7 +156,7 @@ test('templateFromV1: 기존 동사 → template', () => {
 });
 
 test('index.html: v2 저장키/마이그레이션 배선', () => {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   assert.ok(html.includes('nachmal.words.v2'));
   assert.ok(html.includes('STORE_KEY_V1'));
   assert.ok(html.includes('templateFromV1(o.prompt, o.answer)'));
@@ -164,7 +164,7 @@ test('index.html: v2 저장키/마이그레이션 배선', () => {
 });
 
 test('index.html: 렌더링 배선 정리', () => {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   assert.ok(html.includes('id="phrase"'));
   assert.ok(html.includes('function renderPhrase'));
   assert.ok(html.includes('makeOptions(w.answer)'));
@@ -178,7 +178,7 @@ test('index.html: 렌더링 배선 정리', () => {
 });
 
 test('index.html: 편집기 template 형식', () => {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   assert.ok(html.includes('WORDS.map(w=>w.template)'));
   assert.ok(html.includes('DEFAULT_TEMPLATES.join'));
   assert.ok(html.includes('const w = parseTemplate(line)'));
@@ -243,21 +243,21 @@ test('pickRound: 빈 목록은 빈 라운드', () => {
   assert.deepEqual(r, { round: [], played: [], reset: false });
 });
 test('index.html: 라운드/진도 배선', () => {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   assert.ok(html.includes('nachmal.progress.v1'));
   assert.ok(html.includes('const ROUND_SIZE = 7'));
   assert.ok(html.includes('pickRound(all, PROGRESS[mode]'));
   assert.ok(html.includes('coverageDone'));
 });
 test('index.html: 결과 화면 진도/버튼', () => {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   assert.ok(html.includes('id="result-progress"'));
   assert.ok(html.includes('다음 7문제'));
   assert.ok(html.includes('문제 경험 ${experienced}/${totalWords}'));
   assert.ok(!html.includes('다시 풀기'));
 });
 test('index.html: 홈 진도 표시 + 초기화', () => {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   assert.ok(html.includes('id="prog-choice"'));
   assert.ok(html.includes('id="prog-type"'));
   assert.ok(html.includes('id="btn-reset-progress"'));
@@ -265,7 +265,7 @@ test('index.html: 홈 진도 표시 + 초기화', () => {
 });
 
 test('index.html: 홈 진입 시 진도 갱신', () => {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   assert.ok(html.includes("if(name==='home') updateHomeProgress()"));
 });
 
@@ -314,7 +314,7 @@ test('chainCheck: 한 글자 낱말도 허용', () => {
   assert.equal(r.ok, true);
 });
 test('index.html: 끝말잇기 화면/배선', () => {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   assert.ok(html.includes('id="screen-chain"'));
   assert.ok(html.includes('data-mode="chain"'));
   assert.ok(html.includes("chain:$('screen-chain')"));
@@ -324,7 +324,7 @@ test('index.html: 끝말잇기 화면/배선', () => {
   assert.ok(html.includes('nachmal.chain.best.v1'));
 });
 test('index.html: 최고 기록 체인 보기', () => {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   assert.ok(html.includes('id="chain-record-overlay"'));
   assert.ok(html.includes('id="chain-record-btn"'));
   assert.ok(html.includes('nachmal.chain.bestwords.v1'));
@@ -332,7 +332,7 @@ test('index.html: 최고 기록 체인 보기', () => {
   assert.ok(html.includes('function renderWords'));
 });
 test('index.html: 끝말잇기 기록 초기화 버튼', () => {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   assert.ok(html.includes('id="btn-reset-chain"'));
   assert.ok(html.includes('끝말잇기 최고 기록을 초기화'));
   assert.ok(html.includes('removeItem(BEST_KEY)'));
@@ -378,7 +378,7 @@ test('hasContinuation / findHint: 이어갈 사전 낱말 판정', () => {
   assert.equal(findHint('과', words, ['사과','과자']), null);
 });
 test('index.html: 대화형 UI 배선(토글 제거)', () => {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   assert.ok(html.includes('id="chain-bubble"'));
   assert.ok(html.includes('id="register-ask"'));
   assert.ok(html.includes('id="chain-hint-btn"'));
@@ -406,7 +406,7 @@ test('chosungHint: 초성→모음→받침 순 공개', () => {
   assert.equal(chosungHint('강산', 4), '강 산');
 });
 test('index.html: 초성게임 배선', () => {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   assert.ok(html.includes('id="screen-chosung"'));
   assert.ok(html.includes('data-mode="chosung"'));
   assert.ok(html.includes("chosung:$('screen-chosung')"));
