@@ -1586,6 +1586,7 @@ function fbInit(){
 
 function startMulti(mode){
   MG = { mode, uid:null, name:loadNick(), ref:null, members:[], meta:null, hostUid:null, subs:[], allScores:{}, scoreCache:{} };
+  swapSig = null;
   $('multi-title').textContent = (MODE_LABEL[mode]||'') + ' · 같이';
   $('multi-problem-chain').classList.toggle('hidden', mode!=='chain');
   $('multi-problem-chosung').classList.toggle('hidden', mode!=='chosung');
@@ -1907,6 +1908,10 @@ function voteSwap(ok){
 
 // 호스트만 집계·확정한다. presence/meta가 바뀔 때마다 재평가 + 마감용 타이머 1개.
 let swapTimer = null;
+// renderSwapUI가 마지막으로 실제로 그린 '구조'(초/집계 제외)를 기억한다. 1초 tick이
+// 매초 같은 구조를 다시 그리며 버튼을 파괴/재생성하는 것을 막기 위함 — 탭 도중 노드가
+// 바뀌면 클릭이 부모로 새 뒤 씹힌다. 새 세션(startMulti)과 퇴장(leaveMulti)에서만 리셋한다.
+let swapSig = null;
 function tallySwap(){
   if(!MG || !isHost() || !MG.meta) return;
   const m = MG.meta;
@@ -1944,43 +1949,85 @@ function tallySwap(){
 // 표를 지우는 함수는 없다. 표는 req(=그 요청의 until)로 묶여 있어서 다음 요청에는
 // 애초에 안 딸려온다. 게다가 규칙상 남의 표는 지울 수도 없다.
 
+// 지금 렌더링할 '구조'만 나타내는 서명을 계산한다. 초 단위 카운트다운/집계표는
+// 절대 포함하지 않는다 — 포함하면 매초 서명이 바뀌어 아이덴포턴시가 무의미해진다.
+function swapSigOf(){
+  const m = MG && MG.meta;
+  if(!m || m.phase !== 'play') return 'inactive';
+  if(!m.swap) return (m.swapCool && Date.now() < m.swapCool) ? 'cooldown' : 'idle';
+  if(m.swap.by === MG.uid) return 'requester:' + m.swap.until;
+  const mv = myVote();
+  if(mv && mv.req === m.swap.until) return 'voted:' + m.swap.until + ':' + (mv.ok ? 1 : 0);
+  return 'voter:' + m.swap.until;
+}
+
 function renderSwapUI(){
   const el = $('multi-swap'); if(!el) return;
-  const m = MG && MG.meta;
-  if(!m || m.phase !== 'play'){ el.innerHTML = ''; return; }
+  const sig = swapSigOf();
+  const prevSig = swapSig;
+  const changed = sig !== prevSig;
+  swapSig = sig;
 
-  const mv = myVote();
+  if(sig === 'inactive'){
+    if(changed) el.innerHTML = '';
+    return;
+  }
+
+  const m = MG.meta;
   const now = Date.now();
-  if(!m.swap){
-    if(m.swapCool && now < m.swapCool){
-      el.innerHTML = '<button class="btn btn-soft" disabled>🔄 문제 교체 요청</button>';
-      mSay('방금 거부됐어. 조금만 더 생각해보자!');
-    }else{
-      el.innerHTML = '<button class="btn btn-soft" id="multi-swap-ask">🔄 문제 교체 요청</button>';
-      $('multi-swap-ask').addEventListener('click', askSwap);
+
+  if(sig === 'cooldown' || sig === 'idle'){
+    if(changed){
+      if(sig === 'cooldown'){
+        el.innerHTML = '<button class="btn btn-soft" disabled>🔄 문제 교체 요청</button>';
+        // prevSig === 'inactive'면 이 쿨다운은 방금 시작된 게 아니라 reveal 화면 동안
+        // 계속 이어져 온 것이다(라운드가 넘어오며 phase가 play로 막 돌아온 상황). 그때는
+        // renderMulti가 이미 이 라운드의 안내를 mSay로 띄워 놨으니 여기서 또 덮어쓰지 않는다.
+        // 실제로 방금 거부된 순간(voter/requester/voted → cooldown)에는 prevSig가 그중 하나이므로 정상 공지된다.
+        if(prevSig !== 'inactive') mSay('방금 거부됐어. 조금만 더 생각해보자!');
+      }else{
+        el.innerHTML = '<button class="btn btn-soft" id="multi-swap-ask">🔄 문제 교체 요청</button>';
+        $('multi-swap-ask').addEventListener('click', askSwap);
+      }
     }
     tallySwap();
     return;
   }
 
+  // 이 시점부터는 투표가 진행 중인 세 서명(requester/voted/voter) 중 하나다.
+  // 구조는 이미 결정됐으니 여기서는 집계 문구만 계산한다(초마다 바뀌어도 서명에는 안 들어감).
   const votes = MG.members.map(x=>x.vote).filter(v=>v && v.req===m.swap.until);
   const yes = votes.filter(v=>v.ok===true).length;
   const left = Math.max(0, Math.ceil((m.swap.until - now)/1000));
   const tally = '동의 ' + yes + '/' + MG.members.length + ' · ' + left + '초';
 
-  if(m.swap.by === MG.uid){
-    el.innerHTML = '<span class="chain-hint">' + tally + '</span>';
-    mSay('교체 요청했어! 다들 괜찮으면 ' + Math.ceil(SWAP_VOTE_MS/1000) + '초 뒤 바뀐다');
-  }else if(mv && mv.req === m.swap.until){
-    el.innerHTML = '<span class="chain-hint">' + (mv.ok ? '👍 동의함' : '👎 거부함') + ' · ' + tally + '</span>';
-  }else{
-    el.innerHTML = '<button class="btn btn-soft" id="multi-swap-yes">👍 동의</button>' +
-                   '<button class="btn btn-soft" id="multi-swap-no">👎 거부</button>' +
-                   '<span class="chain-hint">' + tally + '</span>';
-    $('multi-swap-yes').addEventListener('click', ()=>voteSwap(true));
-    $('multi-swap-no').addEventListener('click', ()=>voteSwap(false));
-    const who = (MG.members.find(x=>x.uid===m.swap.by)||{}).name || '누군가';
-    mSay(escapeHtml(who) + '가 문제를 바꾸재. 싫으면 ' + left + '초 안에 거부해!');
+  if(sig.indexOf('requester:') === 0){
+    if(changed){
+      el.innerHTML = '<span class="chain-hint" id="multi-swap-tally">' + tally + '</span>';
+      mSay('교체 요청했어! 다들 괜찮으면 ' + Math.ceil(SWAP_VOTE_MS/1000) + '초 뒤 바뀐다');
+    }else{
+      const t = $('multi-swap-tally'); if(t) t.textContent = tally;
+    }
+  }else if(sig.indexOf('voted:') === 0){
+    if(changed){
+      const mv = myVote();
+      el.innerHTML = '<span class="chain-hint">' + (mv.ok ? '👍 동의함' : '👎 거부함') +
+                     ' · <span id="multi-swap-tally">' + tally + '</span></span>';
+    }else{
+      const t = $('multi-swap-tally'); if(t) t.textContent = tally;
+    }
+  }else{ // voter: 아직 투표 안 함, 버튼 보여줌
+    if(changed){
+      el.innerHTML = '<button class="btn btn-soft" id="multi-swap-yes">👍 동의</button>' +
+                     '<button class="btn btn-soft" id="multi-swap-no">👎 거부</button>' +
+                     '<span class="chain-hint" id="multi-swap-tally">' + tally + '</span>';
+      $('multi-swap-yes').addEventListener('click', ()=>voteSwap(true));
+      $('multi-swap-no').addEventListener('click', ()=>voteSwap(false));
+      const who = (MG.members.find(x=>x.uid===m.swap.by)||{}).name || '누군가';
+      mSay(escapeHtml(who) + '가 문제를 바꾸재. 싫으면 ' + left + '초 안에 거부해!');
+    }else{
+      const t = $('multi-swap-tally'); if(t) t.textContent = tally;
+    }
   }
   tallySwap();
 }
@@ -1988,6 +2035,7 @@ function renderSwapUI(){
 function leaveMulti(){
   if(hostTimer){ clearTimeout(hostTimer); hostTimer = null; }
   if(swapTimer){ clearTimeout(swapTimer); swapTimer = null; }
+  swapSig = null;
   if(MG){
     MG.subs.forEach(off=>{ try{ off(); }catch(e){} });
     if(MG.ref && MG.uid) MG.ref.child('presence/' + MG.uid).remove();
