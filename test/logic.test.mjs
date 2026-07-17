@@ -487,3 +487,23 @@ test('public/index.html: 모드 선택 오버레이 배선', () => {
   assert.match(html, /function startChain\(/, 'startChain은 그대로 남아야');
   assert.match(html, /function startChosung\(/, 'startChosung은 그대로 남아야');
 });
+
+test('public/index.html: 같이하기 화면 배선', () => {
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  assert.match(html, /id="screen-multi"/, 'screen-multi가 있어야');
+  assert.match(html, /id="multi-players"/, '접속자 점수판이 있어야');
+  assert.match(html, /id="multi-bubble"/, '🦉 말풍선이 있어야');
+  assert.match(html, /id="multi-nick"/, '닉네임 입력이 있어야');
+  assert.match(html, /multi:\$\('screen-multi'\)/, 'screens 맵에 multi 등록되어야');
+  assert.match(html, /signInAnonymously/, '익명 로그인을 써야');
+  assert.match(html, /onDisconnect\(\)/, 'presence 자동 정리를 써야');
+  assert.match(html, /nachmal\.multi\.nick\.v1/, '닉네임 저장키가 있어야');
+});
+
+test('public/index.html: 같이하기에는 힌트/다른낱말 버튼이 없다', () => {
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  const m = html.match(/<section id="screen-multi"[\s\S]*?<\/section>/);
+  assert.ok(m, 'screen-multi 섹션을 찾아야');
+  assert.doesNotMatch(m[0], /multi-hint-btn/, '같이하기엔 힌트 버튼이 없어야');
+  assert.doesNotMatch(m[0], /다른 낱말/, '같이하기엔 다른 낱말 버튼이 없어야');
+});

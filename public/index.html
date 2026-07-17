@@ -252,6 +252,20 @@
   .register-ask{display:flex; gap:10px; margin-bottom:14px}
   .register-ask .btn{flex:1; min-height:52px; font-size:1rem}
   .chain-hint{text-align:center; font-size:1.35rem; font-weight:800; color:var(--sky); letter-spacing:.12em; min-height:1.4em; margin:2px 0}
+  .players{
+    display:flex; gap:8px; overflow-x:auto; padding:10px 16px 2px;
+    -webkit-overflow-scrolling:touch; scrollbar-width:none;
+  }
+  .players::-webkit-scrollbar{display:none}
+  .pchip{
+    flex:none; display:flex; align-items:center; gap:6px;
+    background:var(--card); border-radius:999px; padding:6px 12px;
+    box-shadow:var(--shadow); font-size:.82rem; white-space:nowrap;
+  }
+  .pchip.me{ outline:2px solid var(--sky) }
+  .pchip .pscore{ font-weight:700 }
+  .pchip.bump{ animation:bump .45s ease }
+  @keyframes bump{ 0%{transform:scale(1)} 40%{transform:scale(1.18)} 100%{transform:scale(1)} }
   .chosung-pattern{text-align:center; font-size:2.8rem; font-weight:900; letter-spacing:.28em; color:var(--sky); margin:6px 0 2px}
   button.score-pill{border:none; cursor:pointer; color:var(--ink); font-family:inherit}
   button.score-pill:active{transform:scale(.94)}
@@ -512,6 +526,59 @@
     </div>
   </div>
 
+  <!-- ============ 같이하기 (멀티) ============ -->
+  <section id="screen-multi" class="hidden">
+    <div class="topbar">
+      <button class="iconbtn" id="btn-multi-home" title="홈으로">←</button>
+      <div class="title" id="multi-title"></div>
+      <div class="spacer"></div>
+      <div class="score-pill">🎯 <span id="multi-round">-</span>R · <span id="multi-myscore">0</span></div>
+      <button class="iconbtn" id="multi-end-x" title="나가기">✕</button>
+    </div>
+    <div class="players" id="multi-players"></div>
+    <div class="card">
+      <div class="assistant">
+        <div class="mascot">🦉</div>
+        <div class="bubble" id="multi-bubble"></div>
+      </div>
+
+      <div id="multi-nick" class="hidden">
+        <div class="type-input-row">
+          <input class="type-input" id="multi-nick-input" type="text" maxlength="12"
+                 autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="닉네임 (1~12자)">
+          <button class="btn btn-sky" id="multi-nick-ok" style="flex:none; min-height:auto; padding:0 20px">입장</button>
+        </div>
+      </div>
+
+      <div id="multi-play" class="hidden">
+        <div id="multi-problem-chain" class="hidden">
+          <div class="chain-flow" id="multi-flow"></div>
+          <div class="chain-need" id="multi-need"></div>
+        </div>
+        <div id="multi-problem-chosung" class="hidden">
+          <div class="chosung-pattern" id="multi-pattern"></div>
+          <div class="chain-need">이 초성으로 된 낱말은?</div>
+        </div>
+        <div class="type-input-row">
+          <input class="type-input" id="multi-input" type="text" inputmode="text"
+                 autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="낱말 입력">
+          <button class="btn btn-sky" id="multi-submit" style="flex:none; min-height:auto; padding:0 20px">확인</button>
+        </div>
+        <div class="chain-hint" id="multi-feedback"></div>
+        <div class="actions" id="multi-swap"></div>
+      </div>
+
+      <div id="multi-endbox" class="chain-endbox hidden">
+        <div class="big" id="multi-endtext"></div>
+        <div id="multi-standings"></div>
+        <div class="actions">
+          <button class="btn btn-soft" id="multi-home2">홈으로</button>
+          <button class="btn btn-primary" id="multi-restart">다시 시작</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ============ RECORD OVERLAY ============ -->
   <div id="chain-record-overlay" class="overlay hidden">
     <div class="overlay-card">
@@ -523,6 +590,9 @@
 
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script>
 "use strict";
 
@@ -789,7 +859,7 @@ function totalProblems(){ return new Set(WORDS.map(w=>w.template)).size; }
 /* ================= DOM ================= */
 const $ = id => document.getElementById(id);
 const screens = {
-  home:$('screen-home'), quiz:$('screen-quiz'), result:$('screen-result'), edit:$('screen-edit'), chain:$('screen-chain'), chosung:$('screen-chosung')
+  home:$('screen-home'), quiz:$('screen-quiz'), result:$('screen-result'), edit:$('screen-edit'), chain:$('screen-chain'), chosung:$('screen-chosung'), multi:$('screen-multi')
 };
 function show(name){
   for(const k in screens) screens[k].classList.toggle('hidden', k!==name);
@@ -1484,7 +1554,131 @@ function openModePick(mode){
   $('modepick-overlay').classList.remove('hidden');
 }
 function closeModePick(){ $('modepick-overlay').classList.add('hidden'); }
-function startMulti(mode){ alert('같이 하기는 아직 준비 중이야! (' + mode + ')'); }
+/* ---------- 같이하기: 연결 · 닉네임 · presence ---------- */
+const NICK_KEY = "nachmal.multi.nick.v1";
+const MULTI_ROUNDS = 10, REVEAL_MS = 3000, SWAP_VOTE_MS = 20000, SWAP_COOL_MS = 30000;
+const FB_CONFIG = {
+  apiKey: "AIzaSyBXr59xkIb_l90kMdErron_5oqCMBZZj1E",
+  authDomain: "nearby-58e2d.firebaseapp.com",
+  databaseURL: "https://nearby-58e2d-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "nearby-58e2d",
+  appId: "1:952923689342:web:4dd6eff3df360fe5a2e32f"
+};
+let MG = null;           // 현재 같이하기 세션
+let fbReady = null;      // 익명 로그인 Promise (한 번만)
+
+function mSay(t){ $('multi-bubble').innerHTML = t; }
+function loadNick(){ return localStorage.getItem(NICK_KEY) || ''; }
+function saveNick(n){ localStorage.setItem(NICK_KEY, n); }
+
+function fbInit(){
+  if(fbReady) return fbReady;
+  fbReady = new Promise((resolve, reject)=>{
+    try{
+      if(!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
+      firebase.auth().signInAnonymously()
+        .then(()=> resolve(firebase.auth().currentUser.uid))
+        .catch(reject);
+    }catch(e){ reject(e); }
+  });
+  return fbReady;
+}
+
+function startMulti(mode){
+  MG = { mode, uid:null, name:loadNick(), ref:null, members:[], meta:null, hostUid:null, subs:[] };
+  $('multi-title').textContent = (MODE_LABEL[mode]||'') + ' · 같이';
+  $('multi-problem-chain').classList.toggle('hidden', mode!=='chain');
+  $('multi-problem-chosung').classList.toggle('hidden', mode!=='chosung');
+  $('multi-play').classList.add('hidden');
+  $('multi-endbox').classList.add('hidden');
+  $('multi-nick').classList.add('hidden');
+  $('multi-players').innerHTML = '';
+  mSay('연결 중이야…');
+  show('multi');
+
+  fbInit().then(uid=>{
+    MG.uid = uid;
+    MG.ref = firebase.database().ref('nunus/' + mode);
+    if(!MG.name){ askNick(); } else { enterRoom(); }
+  }).catch(()=>{
+    mSay('지금은 같이 하기가 안 돼. 혼자 하기로 놀자!');
+  });
+}
+
+function askNick(){
+  $('multi-nick').classList.remove('hidden');
+  mSay('같이 하려면 이름이 필요해! 뭐라고 부를까?');
+  $('multi-nick-input').value = '';
+  $('multi-nick-input').focus();
+}
+function submitNick(){
+  const v = norm($('multi-nick-input').value).slice(0,12);
+  if(!v){ $('multi-nick-input').focus(); return; }
+  saveNick(v); MG.name = v;
+  $('multi-nick').classList.add('hidden');
+  enterRoom();
+}
+
+function enterRoom(){
+  const me = MG.ref.child('presence/' + MG.uid);
+  me.onDisconnect().remove();
+  me.set({ name: MG.name, ts: firebase.database.ServerValue.TIMESTAMP });
+  $('multi-play').classList.remove('hidden');
+  mSay('들어왔다! 잠깐만…');
+
+  const onPresence = MG.ref.child('presence').on('value', snap=>{
+    const v = snap.val() || {};
+    MG.members = Object.keys(v).map(uid => ({ uid, ...v[uid] }));
+    MG.hostUid = pickHost(MG.members.map(m=>m.uid));
+    renderPlayers();
+  });
+  MG.subs.push(()=> MG.ref.child('presence').off('value', onPresence));
+
+  // 연결 끊김: 끊기면 입력을 잠그고 알린다. 복구되면 presence를 다시 심고 재개한다.
+  // (onDisconnect().remove()가 서버에서 우리를 지웠을 수 있으므로 set을 다시 해야 한다.)
+  const conRef = firebase.database().ref('.info/connected');
+  const onCon = conRef.on('value', s=>{
+    if(!MG) return;
+    MG.online = !!s.val();
+    if(!MG.online){
+      mSay('연결이 끊겼어! 다시 연결 중…');
+      $('multi-input').disabled = true;
+      $('multi-submit').disabled = true;
+    }else{
+      const me2 = MG.ref.child('presence/' + MG.uid);
+      me2.onDisconnect().remove();
+      me2.set({ name: MG.name, ts: firebase.database.ServerValue.TIMESTAMP });
+      renderMulti();
+    }
+  });
+  MG.subs.push(()=> conRef.off('value', onCon));
+}
+
+function renderPlayers(){
+  const scores = (MG && MG.scoreCache) || {};
+  const el = $('multi-players');
+  el.innerHTML = '';
+  for(const m of MG.members){
+    const chip = document.createElement('div');
+    chip.className = 'pchip' + (m.uid===MG.uid ? ' me' : '');
+    chip.innerHTML = '<span>' + (m.uid===MG.uid ? '나' : escapeHtml(m.name||'?')) +
+                     '</span><span class="pscore">' + (scores[m.uid]||0) + '</span>';
+    el.appendChild(chip);
+  }
+  $('multi-myscore').textContent = scores[MG.uid] || 0;
+}
+function escapeHtml(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+function renderMulti(){ /* Task 6에서 채운다 */ }
+
+function leaveMulti(){
+  if(MG){
+    MG.subs.forEach(off=>{ try{ off(); }catch(e){} });
+    if(MG.ref && MG.uid) MG.ref.child('presence/' + MG.uid).remove();
+    MG = null;
+  }
+  show('home');
+}
 
 /* ================= 이벤트 바인딩 ================= */
 document.querySelectorAll('.mode-card').forEach(c=>{
@@ -1549,6 +1743,11 @@ $('modepick-multi').addEventListener('click', ()=>{
   startMulti(modePickMode);
 });
 $('modepick-close').addEventListener('click', closeModePick);
+$('multi-nick-ok').addEventListener('click', submitNick);
+$('multi-nick-input').addEventListener('keydown', e=>{ if(e.key==='Enter') submitNick(); });
+$('btn-multi-home').addEventListener('click', leaveMulti);
+$('multi-end-x').addEventListener('click', leaveMulti);
+$('multi-home2').addEventListener('click', leaveMulti);
 $('modepick-overlay').addEventListener('click', e=>{ if(e.target === $('modepick-overlay')) closeModePick(); });
 
 /* ================= 시작 ================= */
