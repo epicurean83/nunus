@@ -1685,6 +1685,8 @@ function enterRoom(){
       $('multi-input').disabled = true;
       $('multi-submit').disabled = true;
       $('multi-swap').innerHTML = '';
+      $('multi-swap-card').classList.add('hidden');
+      $('multi-swap-card').innerHTML = '';
       swapSig = null;
     }else{
       const me2 = MG.ref.child('presence/' + MG.uid);
@@ -1844,7 +1846,8 @@ async function submitMulti(){
     if(!MG || MG.ref !== myRef0) return;
     const m2 = MG.meta;
     if(!m2 || m2.phase !== 'play'){ mFeedback(''); return; }   // 이미 라운드가 끝남 → 조용히
-    $('multi-submit').disabled = false;
+    const _sig = swapSigOf();
+    if(_sig === 'idle' || _sig === 'cooldown' || _sig === 'inactive') $('multi-submit').disabled = false;
     if(found){ addUserWord(word); bad = null; }                // 위키 확인 → 로컬 사전에 저장, 통과
     else bad = 'notindict';
   }
