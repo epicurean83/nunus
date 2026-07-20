@@ -8,14 +8,15 @@ const CORE_NAMES = [
   'isCorrectTyped','makeLetterDistractors','makeOptions','templateFromV1','pickRound',
   'chainCheck','WORD_DICT','isHangulSyllable','SEED_WORDS',
   'hintStages','hintDisplay','hasContinuation','findHint',
-  'chosungOf','chosungHint'
+  'chosungOf','chosungHint',
+  'pickHost','swapOutcome'
 ];
 
 function loadCore(){
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   const start = html.indexOf('/* CORE:START */');
   const end = html.indexOf('/* CORE:END */');
-  if(start < 0 || end < 0) throw new Error('CORE markers not found in index.html');
+  if(start < 0 || end < 0) throw new Error('CORE markers not found in public/index.html');
   const core = html.slice(start, end);
   // Math.random을 결정적으로 주입(오답 셔플 테스트 재현성)
   const seedMath = Object.assign(Object.create(Math), { random: () => 0 });
@@ -156,7 +157,7 @@ test('templateFromV1: 기존 동사 → template', () => {
 });
 
 test('index.html: v2 저장키/마이그레이션 배선', () => {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   assert.ok(html.includes('nachmal.words.v2'));
   assert.ok(html.includes('STORE_KEY_V1'));
   assert.ok(html.includes('templateFromV1(o.prompt, o.answer)'));
@@ -164,7 +165,7 @@ test('index.html: v2 저장키/마이그레이션 배선', () => {
 });
 
 test('index.html: 렌더링 배선 정리', () => {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   assert.ok(html.includes('id="phrase"'));
   assert.ok(html.includes('function renderPhrase'));
   assert.ok(html.includes('makeOptions(w.answer)'));
@@ -178,7 +179,7 @@ test('index.html: 렌더링 배선 정리', () => {
 });
 
 test('index.html: 편집기 template 형식', () => {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   assert.ok(html.includes('WORDS.map(w=>w.template)'));
   assert.ok(html.includes('DEFAULT_TEMPLATES.join'));
   assert.ok(html.includes('const w = parseTemplate(line)'));
@@ -243,21 +244,21 @@ test('pickRound: 빈 목록은 빈 라운드', () => {
   assert.deepEqual(r, { round: [], played: [], reset: false });
 });
 test('index.html: 라운드/진도 배선', () => {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   assert.ok(html.includes('nachmal.progress.v1'));
   assert.ok(html.includes('const ROUND_SIZE = 7'));
   assert.ok(html.includes('pickRound(all, PROGRESS[mode]'));
   assert.ok(html.includes('coverageDone'));
 });
 test('index.html: 결과 화면 진도/버튼', () => {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   assert.ok(html.includes('id="result-progress"'));
   assert.ok(html.includes('다음 7문제'));
   assert.ok(html.includes('문제 경험 ${experienced}/${totalWords}'));
   assert.ok(!html.includes('다시 풀기'));
 });
 test('index.html: 홈 진도 표시 + 초기화', () => {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   assert.ok(html.includes('id="prog-choice"'));
   assert.ok(html.includes('id="prog-type"'));
   assert.ok(html.includes('id="btn-reset-progress"'));
@@ -265,7 +266,7 @@ test('index.html: 홈 진도 표시 + 초기화', () => {
 });
 
 test('index.html: 홈 진입 시 진도 갱신', () => {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   assert.ok(html.includes("if(name==='home') updateHomeProgress()"));
 });
 
@@ -314,17 +315,18 @@ test('chainCheck: 한 글자 낱말도 허용', () => {
   assert.equal(r.ok, true);
 });
 test('index.html: 끝말잇기 화면/배선', () => {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   assert.ok(html.includes('id="screen-chain"'));
   assert.ok(html.includes('data-mode="chain"'));
   assert.ok(html.includes("chain:$('screen-chain')"));
   assert.ok(html.includes('function startChain'));
   assert.ok(html.includes('function submitChain'));
-  assert.ok(html.includes("if(m==='chain') startChain()"));
+  assert.ok(html.includes("if(m==='chain'||m==='chosung') openModePick(m)"));
+  assert.ok(html.includes("if(modePickMode==='chain') startChain()"));
   assert.ok(html.includes('nachmal.chain.best.v1'));
 });
 test('index.html: 최고 기록 체인 보기', () => {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   assert.ok(html.includes('id="chain-record-overlay"'));
   assert.ok(html.includes('id="chain-record-btn"'));
   assert.ok(html.includes('nachmal.chain.bestwords.v1'));
@@ -332,7 +334,7 @@ test('index.html: 최고 기록 체인 보기', () => {
   assert.ok(html.includes('function renderWords'));
 });
 test('index.html: 끝말잇기 기록 초기화 버튼', () => {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   assert.ok(html.includes('id="btn-reset-chain"'));
   assert.ok(html.includes('끝말잇기 최고 기록을 초기화'));
   assert.ok(html.includes('removeItem(BEST_KEY)'));
@@ -378,7 +380,7 @@ test('hasContinuation / findHint: 이어갈 사전 낱말 판정', () => {
   assert.equal(findHint('과', words, ['사과','과자']), null);
 });
 test('index.html: 대화형 UI 배선(토글 제거)', () => {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   assert.ok(html.includes('id="chain-bubble"'));
   assert.ok(html.includes('id="register-ask"'));
   assert.ok(html.includes('id="chain-hint-btn"'));
@@ -406,12 +408,134 @@ test('chosungHint: 초성→모음→받침 순 공개', () => {
   assert.equal(chosungHint('강산', 4), '강 산');
 });
 test('index.html: 초성게임 배선', () => {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   assert.ok(html.includes('id="screen-chosung"'));
   assert.ok(html.includes('data-mode="chosung"'));
   assert.ok(html.includes("chosung:$('screen-chosung')"));
   assert.ok(html.includes('function startChosung'));
   assert.ok(html.includes('function submitChosung'));
-  assert.ok(html.includes("if(m==='chosung') startChosung()"));
+  assert.ok(html.includes("if(m==='chain'||m==='chosung') openModePick(m)"));
+  assert.ok(html.includes('else startChosung()'));
   assert.ok(html.includes('nachmal.chosung.best.v1'));
+});
+
+test('pickHost: 사전순 최소 uid가 호스트', () => {
+  const { pickHost } = loadCore();
+  assert.equal(pickHost(['zeta','alpha','mid']), 'alpha');
+  assert.equal(pickHost(['only']), 'only');
+  assert.equal(pickHost([]), null);
+  assert.equal(pickHost(null), null);
+});
+
+test('swapOutcome: 요청 없으면 none, 지난 라운드 요청은 stale', () => {
+  const { swapOutcome } = loadCore();
+  assert.equal(swapOutcome(null, [], 3, 1000, 5), 'none');
+  const stale = { by:'a', round:4, until:9999 };            // 4라운드 요청인데 지금 5라운드
+  assert.equal(swapOutcome(stale, [], 3, 1000, 5), 'stale');
+});
+
+test('swapOutcome: 거부 한 명이면 즉시 취소 (마감 지나도 거부 우선)', () => {
+  const { swapOutcome } = loadCore();
+  const swap = { by:'a', round:5, until:2000 };
+  const votes = [{req:2000,ok:true},{req:2000,ok:false}];
+  assert.equal(swapOutcome(swap, votes, 3, 1000, 5), 'cancel');
+  assert.equal(swapOutcome(swap, votes, 3, 9999, 5), 'cancel');
+});
+
+test('swapOutcome: 전원 찬성이면 마감 전이라도 즉시 교체', () => {
+  const { swapOutcome } = loadCore();
+  const swap = { by:'a', round:5, until:9999 };
+  const votes = [{req:9999,ok:true},{req:9999,ok:true},{req:9999,ok:true}];
+  assert.equal(swapOutcome(swap, votes, 3, 1000, 5), 'swap');
+});
+
+test('swapOutcome: 20초 지나면 묵시적 동의로 교체 (자리 비운 사람이 못 막음)', () => {
+  const { swapOutcome } = loadCore();
+  const swap = { by:'a', round:5, until:2000 };
+  const votes = [{req:2000,ok:true}];          // 3명 중 1명만 투표
+  assert.equal(swapOutcome(swap, votes, 3, 1999, 5), 'wait');
+  assert.equal(swapOutcome(swap, votes, 3, 2001, 5), 'swap');
+});
+
+test('swapOutcome: 혼자면 자기 찬성만으로 즉시 교체', () => {
+  const { swapOutcome } = loadCore();
+  const swap = { by:'a', round:5, until:9999 };
+  assert.equal(swapOutcome(swap, [{req:9999,ok:true}], 1, 1000, 5), 'swap');
+});
+
+test('swapOutcome: 지난 요청의 표는 새 요청에 안 딸려온다', () => {
+  const { swapOutcome } = loadCore();
+  // 같은 5라운드에서 두 번째 요청(until=8888). 첫 요청(until=5555) 때 받은 찬성표는
+  // req가 안 맞으므로 무효 — 안 그러면 남들이 거부할 새도 없이 즉시 통과해버린다.
+  const swap2 = { by:'a', round:5, until:8888 };
+  const old   = [{req:5555,ok:true},{req:5555,ok:true},{req:5555,ok:true}];
+  assert.equal(swapOutcome(swap2, old, 3, 1000, 5), 'wait');
+  // 요청자 본인 표(새 req)만 있으면 여전히 대기
+  assert.equal(swapOutcome(swap2, [{req:8888,ok:true}], 3, 1000, 5), 'wait');
+});
+
+test('public/index.html: 모드 선택 오버레이 배선', () => {
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  assert.match(html, /id="modepick-overlay"/, '모드 선택 오버레이가 있어야');
+  assert.match(html, /id="modepick-solo"/, '혼자 하기 버튼이 있어야');
+  assert.match(html, /id="modepick-multi"/, '같이 하기 버튼이 있어야');
+  assert.match(html, /function openModePick\(/, 'openModePick이 있어야');
+  // 카드 클릭이 곧바로 startChain/startChosung을 부르지 않고 갈림길을 거쳐야
+  assert.match(html, /dataset\.mode[\s\S]{0,200}openModePick\(/,
+    '모드카드 클릭은 openModePick을 거쳐야');
+  // 혼자하기 진입점은 살아 있어야
+  assert.match(html, /function startChain\(/, 'startChain은 그대로 남아야');
+  assert.match(html, /function startChosung\(/, 'startChosung은 그대로 남아야');
+});
+
+test('public/index.html: 같이하기 화면 배선', () => {
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  assert.match(html, /id="screen-multi"/, 'screen-multi가 있어야');
+  assert.match(html, /id="multi-players"/, '접속자 점수판이 있어야');
+  assert.match(html, /id="multi-bubble"/, '🦉 말풍선이 있어야');
+  assert.match(html, /id="multi-nick"/, '닉네임 입력이 있어야');
+  assert.match(html, /multi:\$\('screen-multi'\)/, 'screens 맵에 multi 등록되어야');
+  assert.match(html, /signInAnonymously/, '익명 로그인을 써야');
+  assert.match(html, /onDisconnect\(\)/, 'presence 자동 정리를 써야');
+  assert.match(html, /nachmal\.multi\.nick\.v1/, '닉네임 저장키가 있어야');
+});
+
+test('public/index.html: 같이하기에는 힌트/다른낱말 버튼이 없다', () => {
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  const m = html.match(/<section id="screen-multi"[\s\S]*?<\/section>/);
+  assert.ok(m, 'screen-multi 섹션을 찾아야');
+  assert.doesNotMatch(m[0], /multi-hint-btn/, '같이하기엔 힌트 버튼이 없어야');
+  assert.doesNotMatch(m[0], /다른 낱말/, '같이하기엔 다른 낱말 버튼이 없어야');
+});
+
+test('public/index.html: 같이하기 문제 출제/구독 배선', () => {
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  assert.match(html, /function newProblem\(/, 'newProblem이 있어야');
+  assert.match(html, /function bootstrapMeta\(/, 'bootstrapMeta가 있어야');
+  assert.match(html, /function renderMulti\(/, 'renderMulti가 있어야');
+  assert.match(html, /\.child\('meta'\)[\s\S]{0,80}\.on\('value'/, 'meta를 구독해야');
+  // 정답을 DB에 올리면 안 된다: 출제 시 answer를 쓰지 않는지
+  assert.doesNotMatch(html, /newProblem[\s\S]{0,400}answer:/, '출제 때 answer를 쓰면 안 됨');
+});
+
+test('public/index.html: 같이하기 승부/점수 배선', () => {
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  assert.match(html, /function submitMulti\(/, 'submitMulti가 있어야');
+  assert.match(html, /function hostTick\(/, 'hostTick이 있어야');
+  assert.match(html, /function restartMulti\(/, 'restartMulti가 있어야');
+  assert.match(html, /\.child\('meta'\)\.transaction\(/, '승부는 meta 트랜잭션이어야');
+  assert.match(html, /scores\/'\s*\+\s*[\s\S]{0,60}gameId/, '점수는 gameId로 키잉해야');
+  assert.match(html, /MULTI_ROUNDS/, '라운드 상한을 써야');
+});
+
+test('public/index.html: 문제 교체 요청 배선', () => {
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  assert.match(html, /function askSwap\(/, 'askSwap이 있어야');
+  assert.match(html, /function voteSwap\(/, 'voteSwap이 있어야');
+  assert.match(html, /function tallySwap\(/, 'tallySwap이 있어야');
+  assert.match(html, /swapOutcome\(/, 'CORE의 swapOutcome을 써야');
+  assert.match(html, /SWAP_VOTE_MS/, '투표 마감 상수를 써야');
+  assert.match(html, /SWAP_COOL_MS/, '거부 쿨다운 상수를 써야');
+  // 표는 presence 아래에만
+  assert.match(html, /presence\/'\s*\+\s*MG\.uid\s*\+\s*'\/vote/, '표는 내 presence 아래에 써야');
 });
