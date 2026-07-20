@@ -266,6 +266,17 @@
   .pchip .pscore{ font-weight:700 }
   .pchip.bump{ animation:bump .45s ease }
   @keyframes bump{ 0%{transform:scale(1)} 40%{transform:scale(1.18)} 100%{transform:scale(1)} }
+  .swap-card{
+    border:2px solid var(--coral); border-radius:var(--radius);
+    background:var(--coral-soft); padding:16px; margin:4px 0 2px;
+    display:flex; flex-direction:column; gap:12px; align-items:stretch; text-align:center;
+  }
+  .swap-card .swap-title{ font-weight:800; font-size:1.02rem }
+  .swap-card .swap-sub{ font-size:.86rem; color:var(--ink-soft) }
+  .swap-card .swap-tally{ font-size:.82rem; color:var(--ink-soft); font-variant-numeric:tabular-nums }
+  .swap-card .swap-btns{ display:flex; gap:10px }
+  .swap-card .swap-btns .btn{ flex:1; min-height:52px; font-size:1.02rem }
+  .btn-danger{ background:var(--coral); color:#fff }
   .chosung-pattern{text-align:center; font-size:2.8rem; font-weight:900; letter-spacing:.28em; color:var(--sky); margin:6px 0 2px}
   button.score-pill{border:none; cursor:pointer; color:var(--ink); font-family:inherit}
   button.score-pill:active{transform:scale(.94)}
@@ -559,6 +570,7 @@
           <div class="chosung-pattern" id="multi-pattern"></div>
           <div class="chain-need">이 초성으로 된 낱말은?</div>
         </div>
+        <div id="multi-swap-card" class="swap-card hidden"></div>
         <div class="type-input-row">
           <input class="type-input" id="multi-input" type="text" inputmode="text"
                  autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="낱말 입력">
@@ -1566,6 +1578,7 @@ const FB_CONFIG = {
 };
 let MG = null;           // 현재 같이하기 세션
 let fbReady = null;      // 익명 로그인 Promise (한 번만)
+let multiBusy = false;   // 위키 확인 중 중복 제출 방지
 
 function mSay(t){ $('multi-bubble').innerHTML = t; }
 function loadNick(){ return localStorage.getItem(NICK_KEY) || ''; }
@@ -1672,6 +1685,8 @@ function enterRoom(){
       $('multi-input').disabled = true;
       $('multi-submit').disabled = true;
       $('multi-swap').innerHTML = '';
+      $('multi-swap-card').classList.add('hidden');
+      $('multi-swap-card').innerHTML = '';
       swapSig = null;
     }else{
       const me2 = MG.ref.child('presence/' + MG.uid);
@@ -1769,6 +1784,7 @@ function renderMulti(){
     // 오프라인이면 onCon이 이미 잠금 문구를 띄우고 입력을 막아놨다 — 여기서 되돌리지 않는다.
   }
   if(m.phase === 'reveal'){
+    mFeedback('');
     $('multi-input').disabled = true;
     $('multi-submit').disabled = true;
     if(m.winner === MG.uid) mSay('🎉 이겼어요! ‘<b>' + escapeHtml(m.answer||'') + '</b>’');
@@ -1808,13 +1824,34 @@ function checkMultiAnswer(word){
   return null;
 }
 
-function submitMulti(){
+async function submitMulti(){
   const m = MG && MG.meta;
   if(!m || m.phase !== 'play') return;
+  if(multiBusy) return;                          // 위키 확인 중 중복 제출 방지
   const word = norm($('multi-input').value);
   if(!word){ $('multi-input').focus(); return; }
 
-  const bad = checkMultiAnswer(word);
+  let bad = checkMultiAnswer(word);
+
+  // 로컬 사전엔 없다 → 위키에 물어본다. (로컬에 있으면 이 분기 자체를 안 타서 즉시 진행)
+  if(bad === 'notindict'){
+    const myRef0 = MG.ref;
+    multiBusy = true;
+    $('multi-submit').disabled = true;
+    mFeedback('사전에서 찾는 중…');
+    let found = false;
+    try { found = await wikiHasWord(word); } catch(e){}
+    multiBusy = false;
+    // 위키 확인하는 동안 방을 나갔거나 세션/게임이 바뀌었을 수 있다
+    if(!MG || MG.ref !== myRef0) return;
+    const m2 = MG.meta;
+    if(!m2 || m2.phase !== 'play'){ mFeedback(''); return; }   // 이미 라운드가 끝남 → 조용히
+    const _sig = swapSigOf();
+    if(_sig === 'idle' || _sig === 'cooldown' || _sig === 'inactive') $('multi-submit').disabled = false;
+    if(found){ addUserWord(word); bad = null; }                // 위키 확인 → 로컬 사전에 저장, 통과
+    else bad = 'notindict';
+  }
+
   if(bad){
     // 코드 이름은 CORE의 chainCheck가 돌려주는 것과 같아야 한다:
     // empty | notword | start | reuse | notindict (+ 초성 전용 pattern)
@@ -1823,7 +1860,7 @@ function submitMulti(){
       reuse:'이미 쓴 낱말이에요',
       notword:'한글 낱말을 입력해요',
       pattern:'초성이 달라요',
-      notindict:'사전에 없는 낱말이에요',
+      notindict:'사전에도 위키에도 없는 낱말이에요',
       empty:''
     }[bad] || '다시 해볼까요?');
     return;
@@ -1973,13 +2010,14 @@ function swapSigOf(){
 
 function renderSwapUI(){
   const el = $('multi-swap'); if(!el) return;
+  const card = $('multi-swap-card');
   const sig = swapSigOf();
   const prevSig = swapSig;
   const changed = sig !== prevSig;
   swapSig = sig;
 
   if(sig === 'inactive'){
-    if(changed) el.innerHTML = '';
+    if(changed){ el.innerHTML = ''; card.classList.add('hidden'); card.innerHTML = ''; }
     return;
   }
 
@@ -1988,6 +2026,7 @@ function renderSwapUI(){
 
   if(sig === 'cooldown' || sig === 'idle'){
     if(changed){
+      card.classList.add('hidden'); card.innerHTML = '';
       if(sig === 'cooldown'){
         el.innerHTML = '<button class="btn btn-soft" disabled>🔄 문제 교체 요청</button>';
         // prevSig === 'inactive'면 이 쿨다운은 방금 시작된 게 아니라 reveal 화면 동안
@@ -1998,6 +2037,8 @@ function renderSwapUI(){
       }else{
         el.innerHTML = '<button class="btn btn-soft" id="multi-swap-ask">🔄 문제 교체 요청</button>';
         $('multi-swap-ask').addEventListener('click', askSwap);
+        // renderSwapUI는 1초 tick에서도 불리므로 renderMulti의 활성화에 의존하지 말고 여기서 직접 켠다.
+        $('multi-input').disabled = false; $('multi-submit').disabled = false;
       }
     }
     tallySwap();
@@ -2011,33 +2052,39 @@ function renderSwapUI(){
   const left = Math.max(0, Math.ceil((m.swap.until - now)/1000));
   const tally = '동의 ' + yes + '/' + MG.members.length + ' · ' + left + '초';
 
-  if(sig.indexOf('requester:') === 0){
-    if(changed){
-      el.innerHTML = '<span class="chain-hint" id="multi-swap-tally">' + tally + '</span>';
+  if(changed){
+    el.innerHTML = '';
+    $('multi-input').disabled = true;
+    $('multi-submit').disabled = true;
+    card.classList.remove('hidden');
+
+    if(sig.indexOf('requester:') === 0){
+      card.innerHTML =
+        '<div class="swap-title">🔄 문제 교체를 기다리는 중…</div>' +
+        '<div class="swap-sub">다들 괜찮으면 20초 뒤 바뀌어요</div>' +
+        '<div class="swap-tally" id="multi-swap-tally">' + tally + '</div>';
       mSay('교체 요청했어! 다들 괜찮으면 ' + Math.ceil(SWAP_VOTE_MS/1000) + '초 뒤 바뀐다');
-    }else{
-      const t = $('multi-swap-tally'); if(t) t.textContent = tally;
-    }
-  }else if(sig.indexOf('voted:') === 0){
-    if(changed){
+    }else if(sig.indexOf('voted:') === 0){
       const mv = myVote();
-      el.innerHTML = '<span class="chain-hint">' + (mv.ok ? '👍 동의함' : '👎 거부함') +
-                     ' · <span id="multi-swap-tally">' + tally + '</span></span>';
-    }else{
-      const t = $('multi-swap-tally'); if(t) t.textContent = tally;
-    }
-  }else{ // voter: 아직 투표 안 함, 버튼 보여줌
-    if(changed){
-      el.innerHTML = '<button class="btn btn-soft" id="multi-swap-yes">👍 동의</button>' +
-                     '<button class="btn btn-soft" id="multi-swap-no">👎 거부</button>' +
-                     '<span class="chain-hint" id="multi-swap-tally">' + tally + '</span>';
+      card.innerHTML =
+        '<div class="swap-title">🔄 문제 교체 투표</div>' +
+        '<div class="swap-sub">' + (mv.ok ? '👍 좋아요라고 했어요' : '👎 싫어요라고 했어요') + '</div>' +
+        '<div class="swap-tally" id="multi-swap-tally">' + tally + '</div>';
+    }else{ // voter: 아직 투표 안 함, 버튼 보여줌
+      const who = (MG.members.find(x=>x.uid===m.swap.by)||{}).name || '누군가';
+      card.innerHTML =
+        '<div class="swap-title">🔄 ' + escapeHtml(who) + '가 문제를 바꾸자고 해요!</div>' +
+        '<div class="swap-tally" id="multi-swap-tally">' + tally + '</div>' +
+        '<div class="swap-btns">' +
+          '<button class="btn btn-primary" id="multi-swap-yes">👍 좋아요</button>' +
+          '<button class="btn btn-danger" id="multi-swap-no">👎 싫어요</button>' +
+        '</div>';
       $('multi-swap-yes').addEventListener('click', ()=>voteSwap(true));
       $('multi-swap-no').addEventListener('click', ()=>voteSwap(false));
-      const who = (MG.members.find(x=>x.uid===m.swap.by)||{}).name || '누군가';
       mSay(escapeHtml(who) + '가 문제를 바꾸재. 싫으면 ' + left + '초 안에 거부해!');
-    }else{
-      const t = $('multi-swap-tally'); if(t) t.textContent = tally;
     }
+  }else{
+    const t = $('multi-swap-tally'); if(t) t.textContent = tally;
   }
   tallySwap();
 }
@@ -2124,6 +2171,7 @@ $('multi-end-x').addEventListener('click', leaveMulti);
 $('multi-home2').addEventListener('click', leaveMulti);
 $('multi-submit').addEventListener('click', submitMulti);
 $('multi-input').addEventListener('keydown', e=>{ if(e.key==='Enter') submitMulti(); });
+$('multi-input').addEventListener('input', ()=>{ if(multiBusy) return; if($('multi-feedback').textContent) mFeedback(''); });
 $('multi-restart').addEventListener('click', restartMulti);
 $('modepick-overlay').addEventListener('click', e=>{ if(e.target === $('modepick-overlay')) closeModePick(); });
 

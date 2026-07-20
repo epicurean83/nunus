@@ -130,3 +130,14 @@ Task 10: complete — 배포됨 (hosting + database)
     다음 플레이어가 이어받는 정상 시작점. 배포 후이므로 /nunus 통째 삭제 안 함.
 
 === 전 태스크 완료. feature/multiplayer 배포 완료. ===
+
+=== 후속 개선 3건 (feature/multi-wiki-swap-ui) ===
+1. 위키 폴백: submitMulti async화. 로컬 사전에 있으면 즉시 제출(레이스 속도 유지),
+   없을 때만 wikiHasWord 확인 -> 있으면 addUserWord+통과. 위키 실제 네트워크 호출 확인(첨성대 통과).
+2. 교체 요청 카드: 문제 영역에 강조 카드(#multi-swap-card, coral 테두리). "OO가 문제를 바꾸자고 해요!"
+   + 초록 좋아요/빨강 싫어요(btn-danger). 투표 중 입력창 비활성. 요청자는 "기다리는 중" 카드.
+   스크린샷으로 두 뷰 확인 완료.
+3. 피드백 자동 클리어: input 이벤트 + reveal 진입 시 mFeedback('') (multiBusy 중엔 유지).
+opus 리뷰: Important 1(오프라인 시 카드 미정리 회귀) + Minor 1(await 후 submit 무조건 재활성) 발견 -> 수정.
+  fail-before/pass-after로 둘 다 증명. 66/66 유지. 솔로 무손상. commits 3b1de68, 24de347.
+Minor(미해결, 기존/스코프밖): wikiHasWord가 일시적 네트워크 실패 시 false 캐시 -> 세션 내 실재어 거부(solo도 동일).
