@@ -9,7 +9,7 @@ const CORE_NAMES = [
   'chainCheck','WORD_DICT','isHangulSyllable','SEED_WORDS',
   'hintStages','hintDisplay','hasContinuation','findHint',
   'chosungOf','chosungHint',
-  'pickHost','swapOutcome','nickChange'
+  'pickHost','swapOutcome','nickChange','inputLock'
 ];
 
 function loadCore(){
@@ -570,4 +570,59 @@ test('nickChange: 최초 입장(현재 이름 없음)은 항상 changed=true', (
   const { nickChange } = loadCore();
   assert.deepEqual(nickChange('', '가가'),        { ok:true, changed:true, name:'가가' });
   assert.deepEqual(nickChange(undefined, '가가'), { ok:true, changed:true, name:'가가' });
+});
+
+test('inputLock: 다섯 조건이 모두 통과하면 둘 다 열린다', () => {
+  const { inputLock } = loadCore();
+  assert.deepEqual(
+    inputLock({ phase:'play', online:true, editing:false, busy:false, voting:false }),
+    { input:true, submit:true });
+});
+
+test('inputLock: play가 아니면 다른 조건과 무관하게 둘 다 닫힌다', () => {
+  const { inputLock } = loadCore();
+  for(const phase of ['reveal','over',null,undefined]){
+    assert.deepEqual(
+      inputLock({ phase, online:true, editing:false, busy:false, voting:false }),
+      { input:false, submit:false }, 'phase=' + phase);
+  }
+});
+
+test('inputLock: 교체 투표 중이면 둘 다 닫힌다', () => {
+  const { inputLock } = loadCore();
+  assert.deepEqual(
+    inputLock({ phase:'play', online:true, editing:false, busy:false, voting:true }),
+    { input:false, submit:false });
+});
+
+test('inputLock: 이름 편집 중이면 둘 다 닫힌다', () => {
+  const { inputLock } = loadCore();
+  assert.deepEqual(
+    inputLock({ phase:'play', online:true, editing:true, busy:false, voting:false }),
+    { input:false, submit:false });
+});
+
+test('inputLock: 오프라인이면 둘 다 닫힌다', () => {
+  const { inputLock } = loadCore();
+  assert.deepEqual(
+    inputLock({ phase:'play', online:false, editing:false, busy:false, voting:false }),
+    { input:false, submit:false });
+});
+
+test('inputLock: 위키 조회 중에는 입력창만 열리고 확인 버튼은 닫힌다', () => {
+  const { inputLock } = loadCore();
+  assert.deepEqual(
+    inputLock({ phase:'play', online:true, editing:false, busy:true, voting:false }),
+    { input:true, submit:false });
+});
+
+test('inputLock: busy 말고는 input과 submit이 갈리지 않는다', () => {
+  const { inputLock } = loadCore();
+  // busy를 false로 고정하면 32가지 조합 어디서도 두 값이 달라지지 않아야 한다.
+  for(const phase of ['play','reveal']) for(const online of [true,false])
+  for(const editing of [true,false]) for(const voting of [true,false]){
+    const r = inputLock({ phase, online, editing, busy:false, voting });
+    assert.equal(r.input, r.submit,
+      JSON.stringify({ phase, online, editing, voting }) + ' → ' + JSON.stringify(r));
+  }
 });

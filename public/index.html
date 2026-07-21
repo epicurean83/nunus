@@ -825,6 +825,14 @@ function nickChange(current, raw){
   if(!name) return { ok:false, changed:false, name:'' };
   return { ok:true, changed: name !== (current || ''), name };
 }
+
+// 게임 입력이 열려야 하는지를 판단하는 유일한 자리. 이 판단이 여러 곳에 흩어져 있으면
+// 조건이 늘 때마다 한 곳씩 빠뜨린다(실제로 세 번 그랬다). 조건은 여기서만 바꾼다.
+// 입력창과 확인 버튼이 갈리는 경우는 위키 조회 중(busy)뿐이다 — 그때도 타이핑은 계속할 수 있다.
+function inputLock({ phase, online, editing, busy, voting }){
+  const on = phase === 'play' && !!online && !editing && !voting;
+  return { input: on, submit: on && !busy };
+}
 /* CORE:END */
 
 const STORE_KEY_V1 = "nachmal.words.v1";
