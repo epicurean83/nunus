@@ -215,3 +215,21 @@ Task 3: complete (commit 570a645, review clean) — multi-race.mjs에 3.7 투표
   `git commit -- <path>`로 경로를 한정한다.
 기존 플레이크 관측: 앞선 레이스 시나리오에서 이을 낱말을 못 찾아 스위트가 중단(3회 중 1회).
   3.7 자체는 사전을 안 쓰므로 영향 없음.
+최종 whole-branch 리뷰(opus) 1차: SHIP + Important 2 -> 수정(commit 2cf7a9a)
+  1. submitMulti가 여전히 5조건 중 2개만 보는 2차 게이트였음(online/editing/voting 미확인).
+     DOM 잠금이 stale해지면 투표 중 답이 트랜잭션까지 도달. -> lockState() 헬퍼를 뽑아
+     syncInputLock과 submitMulti가 같은 owner에게 묻게 함.
+  2. enterRoom이 첫 meta 이벤트 전에 #multi-play를 보여주는데 markup에 disabled가 없어서
+     방 입장 때마다 입력창이 잠깐 살아 있었음 -> markup에 disabled 추가.
+  덤(Minor): startMulti에서 multiBusy=false 리셋(방을 나갔다 오면 확인 버튼이 잠긴 채 남던 문제).
+2차 리뷰(opus): "fix first" — 위키 조회 재개 경로에 같은 2-of-5 게이트가 남아 있었음.
+  투표가 await 중에 열리면 재개된 제출이 통과해 트랜잭션까지 가고 투표까지 지워버림.
+  -> 재개 지점도 inputLock(lockState()).submit로 교체, multiBusy=false를 세션 체크 뒤로 이동.
+  commit 64b4aef.
+컨트롤러 통합 재실행: 전항목 PASS, exit 0 (알려진 사전 플레이크로 1회 중단 후 재실행).
+라이브 검증: 입장 전 입력 잠김(true/true) -> 입장 후 열림(false/false) -> 실제 제출 성공("무응답").
+미해결(후속 티켓):
+ - 위키 조회 중에 투표가 열리는 인터리빙은 통합 테스트에 없음. 코드 추적으로만 확인됨.
+   증명하려면 A가 미지의 낱말을 제출해 await 중일 때 B가 askSwap하는 시나리오가 필요.
+ - multi-race.mjs 플레이크(끝말잇기 사전에 이을 낱말이 없어 스위트 중단): 3회 중 1회꼴.
+   유일한 통합 게이트를 흔들므로 고칠 가치 있음.
