@@ -817,6 +817,13 @@ function swapOutcome(swap, votes, memberCount, now, round){
   if(now > swap.until) return 'swap';                    // 묵시적 동의
   return 'wait';
 }
+// 닉네임 입력 판정. ok=false면 유효하지 않은 입력(닫지 말고 다시 받는다),
+// changed=false면 바뀐 게 없으니 저장·전송을 건너뛴다.
+function nickChange(current, raw){
+  const name = norm(raw).slice(0, 12);
+  if(!name) return { ok:false, changed:false, name:'' };
+  return { ok:true, changed: name !== (current || ''), name };
+}
 /* CORE:END */
 
 const STORE_KEY_V1 = "nachmal.words.v1";
