@@ -1710,10 +1710,15 @@ function renderPlayers(){
   const el = $('multi-players');
   el.innerHTML = '';
   for(const m of MG.members){
+    const isMe = m.uid === MG.uid;
     const chip = document.createElement('div');
-    chip.className = 'pchip' + (m.uid===MG.uid ? ' me' : '');
-    chip.innerHTML = '<span>' + (m.uid===MG.uid ? '나' : escapeHtml(m.name||'?')) +
-                     '</span><span class="pscore">' + (scores[m.uid]||0) + '</span>';
+    chip.className = 'pchip' + (isMe ? ' me' : '');
+    // 내 칩에는 실제 이름을 보여준다 — 남들에게 어떻게 보이는지 확인할 유일한 곳이고,
+    // 이름을 바꾼 뒤 반영됐는지도 여기서 확인한다.
+    const label = isMe
+      ? (MG.name ? escapeHtml(MG.name) + '(나)' : '나') + ' ✏️'
+      : escapeHtml(m.name || '?');
+    chip.innerHTML = '<span>' + label + '</span><span class="pscore">' + (scores[m.uid]||0) + '</span>';
     el.appendChild(chip);
   }
   $('multi-myscore').textContent = scores[MG.uid] || 0;
