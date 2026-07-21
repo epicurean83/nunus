@@ -1918,11 +1918,12 @@ async function submitMulti(){
     mFeedback('사전에서 찾는 중…');
     let found = false;
     try { found = await wikiHasWord(word); } catch(e){}
-    multiBusy = false;
     // 위키 확인하는 동안 방을 나갔거나 세션/게임이 바뀌었을 수 있다
     if(!MG || MG.ref !== myRef0) return;
-    const m2 = MG.meta;
-    if(!m2 || m2.phase !== 'play'){ mFeedback(''); return; }   // 이미 라운드가 끝남 → 조용히
+    multiBusy = false;
+    // 재개 시점에도 진입할 때와 같은 owner(inputLock)에게 다시 물어본다 —
+    // 그사이 교체투표가 열렸거나, 닉네임 수정 중이거나, 연결이 끊겼을 수 있다
+    if(!inputLock(lockState()).submit){ mFeedback(''); return; }
     syncInputLock();
     if(found){ addUserWord(word); bad = null; }                // 위키 확인 → 로컬 사전에 저장, 통과
     else bad = 'notindict';
