@@ -1758,7 +1758,6 @@ function renderPlayers(){
       ? (MG.name ? escapeHtml(MG.name) + '(나)' : '나') + ' ✏️'
       : escapeHtml(m.name || '?');
     chip.innerHTML = '<span>' + label + '</span><span class="pscore">' + (scores[m.uid]||0) + '</span>';
-    if(isMe) chip.addEventListener('click', openNickEdit);
     el.appendChild(chip);
   }
   $('multi-myscore').textContent = scores[MG.uid] || 0;
@@ -1988,6 +1987,7 @@ function myVote(){
 }
 function askSwap(){
   const m = MG.meta; if(!m || m.phase!=='play') return;
+  if(MG.nickEditing) return;                     // 이름 편집 중엔 교체 요청도 막는다
   if(m.swapCool && Date.now() < m.swapCool) return;
   // 요청을 먼저 확정하고, 확정된 until을 req로 삼아 자동 찬성표를 던진다.
   MG.ref.child('meta').transaction(cur=>{
@@ -2219,6 +2219,11 @@ $('modepick-multi').addEventListener('click', ()=>{
   startMulti(modePickMode);
 });
 $('modepick-close').addEventListener('click', closeModePick);
+// renderPlayers가 presence/meta/scores마다 칩을 통째로 새로 그리므로, 칩 자체에 리스너를
+// 달면 탭이 재렌더링 사이에 낀 순간 유령 노드에 떨어져 씹힌다 — 컨테이너에 한 번만 위임한다.
+$('multi-players').addEventListener('click', e=>{
+  if(e.target.closest('.pchip.me')) openNickEdit();
+});
 $('multi-nick-ok').addEventListener('click', submitNick);
 $('multi-nick-input').addEventListener('keydown', e=>{ if(e.key==='Enter') submitNick(); });
 $('multi-nick-cancel').addEventListener('click', closeNick);

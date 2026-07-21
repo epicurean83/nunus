@@ -745,6 +745,53 @@ try{
     gameIdsUsed.add(await A.page.evaluate(() => MG.meta.gameId));
   }
 
+  /* 3.6) 편집 폼이 열린 채로 시작된 교체 투표 — 폼을 닫아도 투표 잠금이 살아있어야 한다 */
+  {
+    info('편집 폼을 연 뒤에 교체 투표가 시작되면, 폼을 닫을 때 잠금이 되살아나는지 확인');
+    await waitPhase(A.page, 'play', 8000).catch(() => {});
+    await waitPhase(B.page, 'play', 8000).catch(() => {});
+
+    // 진짜 클릭으로 편집 폼을 연다 — 위임 리스너 경유로도 진입점이 살아있는지 재확인한다.
+    await A.page.click('.pchip.me');
+    const editOpened = await waitFor(A.page,
+      () => !document.getElementById('multi-nick').classList.contains('hidden'),
+      [], { timeout: 3000, label: '이름 입력창이 열림(투표 잠금 시나리오)' }).catch(() => false);
+    report('교체 투표 잠금 시나리오: 칩 탭으로 편집 폼이 열림', !!editOpened);
+
+    // 편집 폼이 열려 있는 동안 B가 교체 투표를 시작한다 — UI를 거치지 않고 직접 호출한다.
+    await B.page.evaluate(() => askSwap());
+
+    const swapSeenWhileEditing = await waitFor(A.page, () => !!(MG.meta && MG.meta.swap), [],
+      { timeout: 5000, label: '편집 중인 A가 교체 투표를 인지함' }).catch(() => false);
+    report('편집 폼이 열린 채로도 A가 교체 투표를 인지함', !!swapSeenWhileEditing);
+
+    // 이름을 바꾸고 폼을 닫는다 — closeNick()이 swapSig를 지워야 renderSwapUI가
+    // "구조 안 바뀜"으로 착각해 잠금을 되살리지 못하는 사고가 없다(이 리셋이 없으면,
+    // 편집 중 이미 한 번 그려진 voter 서명과 지금 서명이 같아 보여 재렌더를 건너뛰고
+    // 위쪽 phase==='play' 분기가 켜놓은 입력이 그대로 살아남는다).
+    await A.page.$eval('#multi-nick-input', e => { e.value = ''; });
+    await A.page.type('#multi-nick-input', '모모');
+    await A.page.click('#multi-nick-ok');
+
+    const editClosed = await waitFor(A.page,
+      () => document.getElementById('multi-nick').classList.contains('hidden'),
+      [], { timeout: 3000, label: '이름 입력창이 닫힘(투표 잠금 시나리오)' }).catch(() => false);
+    report('투표 중에도 바꾸기를 누르면 편집 폼이 닫힘', !!editClosed);
+
+    const lockedAfterClose = await A.page.$eval('#multi-input', e => e.disabled);
+    report('편집 폼을 닫아도 진행 중인 교체 투표가 게임 입력을 계속 잠금(swapSig 리셋 검증)',
+      lockedAfterClose === true, 'disabled=' + lockedAfterClose);
+
+    // 뒷 블록(호스트 승계)이 깨끗한 상태에서 시작하도록 투표를 정리한다 — A가 명시적으로
+    // 거부해 'cancel'로 즉시 끝낸다(20초 묵시적 동의를 기다리지 않는다).
+    await A.page.evaluate(() => voteSwap(false));
+    await waitFor(A.page, () => !(MG.meta && MG.meta.swap), [],
+      { timeout: 5000, label: '투표 정리(거부) 반영' }).catch(() => {});
+
+    A.nick = '모모';
+    gameIdsUsed.add(await A.page.evaluate(() => MG.meta.gameId));
+  }
+
   /* 4) 호스트 승계 — 호스트가 탭을 닫아도 남은 쪽이 진행 */
   {
     const hostIsA = await A.page.evaluate(() => isHost());
