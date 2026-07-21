@@ -253,7 +253,7 @@
   .register-ask .btn{flex:1; min-height:52px; font-size:1rem}
   .chain-hint{text-align:center; font-size:1.35rem; font-weight:800; color:var(--sky); letter-spacing:.12em; min-height:1.4em; margin:2px 0}
   .players{
-    display:flex; gap:8px; overflow-x:auto; padding:10px 16px 2px;
+    display:flex; gap:8px; overflow-x:auto; padding:10px 16px 12px;
     -webkit-overflow-scrolling:touch; scrollbar-width:none;
   }
   .players::-webkit-scrollbar{display:none}
@@ -262,13 +262,13 @@
     background:var(--card); border-radius:999px; padding:6px 12px;
     box-shadow:var(--shadow); font-size:.82rem; white-space:nowrap;
   }
-  .pchip.me{ outline:2px solid var(--sky) }
+  .pchip.me{ outline:2px solid var(--sky); cursor:pointer }
   .pchip .pscore{ font-weight:700 }
   .pchip.bump{ animation:bump .45s ease }
   @keyframes bump{ 0%{transform:scale(1)} 40%{transform:scale(1.18)} 100%{transform:scale(1)} }
   .swap-card{
     border:2px solid var(--coral); border-radius:var(--radius);
-    background:var(--coral-soft); padding:16px; margin:4px 0 2px;
+    background:var(--coral-soft); padding:16px; margin:14px 0 12px;
     display:flex; flex-direction:column; gap:12px; align-items:stretch; text-align:center;
   }
   .swap-card .swap-title{ font-weight:800; font-size:1.02rem }
