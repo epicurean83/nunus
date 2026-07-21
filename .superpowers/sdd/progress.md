@@ -186,3 +186,32 @@ Minor/Important(미해결, 후속 티켓 대상):
    시간 동안 입력이 열린 채 남는다. closeNick 사례만 이번에 막았고 일반 케이스는 남아 있음.
    근본 해결책: 입력 잠금 판단을 syncInputLock() 한 곳으로 모으기(세 곳에 흩어져 있음).
  - Task 4 Minor 5건은 전부 "ship" 판정(도달 불가하거나 미관 문제). 상세는 위 Task 4 항목 참조.
+
+=== 입력 잠금 단일 소유자 (2026-07-21, feature/input-lock-owner) ===
+Task 1: complete (commits 66fb003..ac62749, review clean) — inputLock 순수함수, 테스트 71->79
+  리뷰 Important: online:undefined 미테스트(래퍼가 boolean으로 정규화하지만 계약이 안 박혀 있었음)
+  -> 테스트 추가, `online ?? true` 변이에서 실패함을 확인.
+Task 2: complete (commits ac62749..4fccda9, review clean) — syncInputLock으로 8지점 전부 교체
+  opus 리뷰가 지점별로 옛 상태 vs 새 계산을 대조: 6곳 동일, 2곳만 달라지고 둘 다 개선.
+   (a) renderMulti play가 meta.swap을 보게 됨 = 목표 결함 수정
+   (b) 위키 조회 중 presence 이벤트가 확인 버튼을 되살리던 것도 함께 막힘(무해했지만 시각적 오류)
+  위키 조회 중 타이핑 유지 확인. renderMulti가 모든 phase에서 래퍼에 도달(over/오프라인 포함).
+  renderMulti -> syncInputLock -> renderSwapUI -> syncInputLock 순서는 멱등(순수함수 + 무인자).
+  Minor(미해결): syncInputLock에 DOM 널가드 없음(정적 요소라 도달 불가) / renderMulti의 !m 조기
+   반환과 startMulti 리셋은 래퍼에 안 닿음(그 구간엔 #multi-play가 숨겨져 있음, 기존 동작).
+Task 3 1차 시도: 서브에이전트가 올바르게 escalate. 계획의 fail-before 절차가 틀렸음 —
+  play 분기에 옛 두 줄을 되살려도 같은 함수 끝의 syncInputLock()이 즉시 다시 잠가서 결함이
+  재현되지 않음(pass 나옴). 정정: `git checkout ac62749 -- public/index.html`로 실제 결함
+  코드를 꺼내 돌린다. 계획 문서도 같이 정정함.
+  또 기존 플레이크 관측: 앞선 레이스 시나리오에서 이을 낱말을 못 찾아 스위트가 중단되는 경우 있음.
+Task 3: complete (commit 570a645, review clean) — multi-race.mjs에 3.7 투표 잠금 시나리오
+  fail-before는 실제 결함 파일(ac62749)로 돌려야 재현됨: [FAIL] disabled=false voteOpen=true.
+  pass-after: 전항목 PASS, exit 0. 로직 79/0, rules-check 통과.
+사고: 서브에이전트가 fail-before용으로 `git checkout ac62749 -- public/index.html`을 실행한 사이
+  컨트롤러가 같은 워킹트리에서 계획 문서를 커밋 -> 그 명령이 인덱스도 쓰기 때문에 Task 2 수정이
+  통째로 딸려 들어가 되돌려짐(6a02320). 서브에이전트가 커밋 직전에 발견해 escalate.
+  복원 커밋 5a12aec. 이후 3커밋 범위 순효과가 0임을 리뷰가 독립 확인.
+  교훈: 백그라운드 서브에이전트가 워킹트리를 조작하는 동안 커밋하지 않는다. 하더라도
+  `git commit -- <path>`로 경로를 한정한다.
+기존 플레이크 관측: 앞선 레이스 시나리오에서 이을 낱말을 못 찾아 스위트가 중단(3회 중 1회).
+  3.7 자체는 사전을 안 쓰므로 영향 없음.

@@ -792,6 +792,50 @@ try{
     gameIdsUsed.add(await A.page.evaluate(() => MG.meta.gameId));
   }
 
+  /* 3.7) 투표 중에는 presence 이벤트가 와도 입력이 풀리지 않는다 */
+  {
+    info('투표 잠금: B가 교체 투표를 열고, 그동안 A가 presence 이벤트를 일으킨다');
+    await waitPhase(A.page, 'play', 8000).catch(() => {});
+
+    // 직전 시나리오의 쿨다운이 남아 있으면 askSwap이 조용히 거부된다 — 풀릴 때까지 기다린다.
+    await waitFor(B.page, () => {
+      const m = MG && MG.meta;
+      return !!m && m.phase === 'play' && !m.swap && !(m.swapCool && Date.now() < m.swapCool);
+    }, [], { timeout: 40000, label: 'B가 교체 요청 가능한 상태' });
+
+    await B.page.evaluate(() => askSwap());
+    const sawVote = await waitFor(A.page, () => !!(MG.meta && MG.meta.swap), [],
+      { timeout: 5000, label: 'A가 투표를 인지함' }).catch(() => false);
+    report('투표 잠금: A가 교체 투표를 인지함', !!sawVote);
+
+    const lockedOnVote = await A.page.$eval('#multi-input', e => e.disabled);
+    report('투표 잠금: 투표가 열리면 A의 입력이 잠김', lockedOnVote === true,
+      'disabled=' + lockedOnVote);
+
+    // 결함의 방아쇠: 투표가 진행되는 동안 presence 쓰기를 일으켜 A의 renderMulti를 태운다.
+    // 예전에는 play 분기가 meta.swap을 보지 않고 입력을 되살렸고, renderSwapUI는 서명이
+    // 안 바뀌었다며 다시 잠그지 않아, 남은 투표 시간 내내 A만 답할 수 있었다.
+    await A.page.evaluate(() => MG.ref.child('presence/' + MG.uid)
+      .update({ name: MG.name + '!' }));
+    await waitFor(A.page, () => (MG.members || []).some(x => /!$/.test(x.name || '')), [],
+      { timeout: 5000, label: 'A의 presence 갱신이 되돌아옴' });
+    await sleep(400);   // renderMulti/renderSwapUI가 이벤트를 처리할 여유
+
+    const stillLocked = await A.page.$eval('#multi-input', e => e.disabled);
+    const voteStillOpen = await A.page.evaluate(() => !!(MG.meta && MG.meta.swap));
+    report('투표 중 presence 이벤트가 와도 입력이 잠긴 채 유지됨',
+      stillLocked === true && voteStillOpen === true,
+      'disabled=' + stillLocked + ' voteOpen=' + voteStillOpen);
+
+    // 뒷정리: 이름을 되돌리고 투표를 접어 다음 블록에 영향을 주지 않게 한다.
+    await A.page.evaluate(() => MG.ref.child('presence/' + MG.uid)
+      .update({ name: MG.name }));
+    await B.page.evaluate(() => MG.ref.child('meta/swap').remove()).catch(() => {});
+    await waitFor(A.page, () => !(MG.meta && MG.meta.swap), [],
+      { timeout: 5000, label: '투표가 정리됨' }).catch(() => false);
+    await sleep(600);
+  }
+
   /* 4) 호스트 승계 — 호스트가 탭을 닫아도 남은 쪽이 진행 */
   {
     const hostIsA = await A.page.evaluate(() => isHost());
