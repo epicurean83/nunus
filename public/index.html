@@ -253,7 +253,7 @@
   .register-ask .btn{flex:1; min-height:52px; font-size:1rem}
   .chain-hint{text-align:center; font-size:1.35rem; font-weight:800; color:var(--sky); letter-spacing:.12em; min-height:1.4em; margin:2px 0}
   .players{
-    display:flex; gap:8px; overflow-x:auto; padding:10px 16px 2px;
+    display:flex; gap:8px; overflow-x:auto; padding:10px 16px 12px;
     -webkit-overflow-scrolling:touch; scrollbar-width:none;
   }
   .players::-webkit-scrollbar{display:none}
@@ -262,13 +262,13 @@
     background:var(--card); border-radius:999px; padding:6px 12px;
     box-shadow:var(--shadow); font-size:.82rem; white-space:nowrap;
   }
-  .pchip.me{ outline:2px solid var(--sky) }
+  .pchip.me{ outline:2px solid var(--sky); cursor:pointer }
   .pchip .pscore{ font-weight:700 }
   .pchip.bump{ animation:bump .45s ease }
   @keyframes bump{ 0%{transform:scale(1)} 40%{transform:scale(1.18)} 100%{transform:scale(1)} }
   .swap-card{
     border:2px solid var(--coral); border-radius:var(--radius);
-    background:var(--coral-soft); padding:16px; margin:4px 0 2px;
+    background:var(--coral-soft); padding:16px; margin:14px 0 12px;
     display:flex; flex-direction:column; gap:12px; align-items:stretch; text-align:center;
   }
   .swap-card .swap-title{ font-weight:800; font-size:1.02rem }
@@ -558,6 +558,7 @@
           <input class="type-input" id="multi-nick-input" type="text" maxlength="12"
                  autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="닉네임 (1~12자)">
           <button class="btn btn-sky" id="multi-nick-ok" style="flex:none; min-height:auto; padding:0 20px">입장</button>
+          <button class="btn btn-soft hidden" id="multi-nick-cancel" style="flex:none; min-height:auto; padding:0 16px">취소</button>
         </div>
       </div>
 
@@ -816,6 +817,13 @@ function swapOutcome(swap, votes, memberCount, now, round){
   if(v.filter(x => x.ok === true).length >= memberCount) return 'swap';
   if(now > swap.until) return 'swap';                    // 묵시적 동의
   return 'wait';
+}
+// 닉네임 입력 판정. ok=false면 유효하지 않은 입력(닫지 말고 다시 받는다),
+// changed=false면 바뀐 게 없으니 저장·전송을 건너뛴다.
+function nickChange(current, raw){
+  const name = norm(raw).slice(0, 12);
+  if(!name) return { ok:false, changed:false, name:'' };
+  return { ok:true, changed: name !== (current || ''), name };
 }
 /* CORE:END */
 
@@ -1598,7 +1606,7 @@ function fbInit(){
 }
 
 function startMulti(mode){
-  MG = { mode, uid:null, name:loadNick(), ref:null, members:[], meta:null, hostUid:null, subs:[], allScores:{}, scoreCache:{} };
+  MG = { mode, uid:null, name:loadNick(), ref:null, members:[], meta:null, hostUid:null, subs:[], allScores:{}, scoreCache:{}, nickEditing:false };
   swapSig = null;
   $('multi-title').textContent = (MODE_LABEL[mode]||'') + ' · 같이';
   $('multi-problem-chain').classList.toggle('hidden', mode!=='chain');
@@ -1613,24 +1621,61 @@ function startMulti(mode){
   fbInit().then(uid=>{
     MG.uid = uid;
     MG.ref = firebase.database().ref('nunus/' + mode);
-    if(!MG.name){ askNick(); } else { enterRoom(); }
+    if(!MG.name){ askNick('enter'); } else { enterRoom(); }
   }).catch(()=>{
     mSay('지금은 같이 하기가 안 돼. 혼자 하기로 놀자!');
   });
 }
 
-function askNick(){
+function askNick(mode){
+  const edit = mode === 'edit';
+  MG.nickEditing = edit;
   $('multi-nick').classList.remove('hidden');
-  mSay('같이 하려면 이름이 필요해! 뭐라고 부를까?');
-  $('multi-nick-input').value = '';
+  $('multi-nick-input').value = edit ? MG.name : '';
+  $('multi-nick-ok').textContent = edit ? '바꾸기' : '입장';
+  $('multi-nick-cancel').classList.toggle('hidden', !edit);
+  mSay(edit ? '새 이름을 뭐라고 할까?' : '같이 하려면 이름이 필요해! 뭐라고 부를까?');
+  if(edit){
+    // 편집 중에는 게임 입력을 잠근다. renderMulti가 되살리지 못하도록 nickEditing으로 게이팅됨.
+    $('multi-input').disabled = true;
+    $('multi-submit').disabled = true;
+  }
   $('multi-nick-input').focus();
+  if(edit) $('multi-nick-input').select();
 }
-function submitNick(){
-  const v = norm($('multi-nick-input').value).slice(0,12);
-  if(!v){ $('multi-nick-input').focus(); return; }
-  saveNick(v); MG.name = v;
+
+// 편집 상태를 걷고 화면을 원래대로 돌린다(확정·취소·오프라인 모두 이 경로).
+function closeNick(){
+  MG.nickEditing = false;
   $('multi-nick').classList.add('hidden');
-  enterRoom();
+  $('multi-nick-cancel').classList.add('hidden');
+  // 편집 폼이 열린 사이 교체 투표가 새로 시작됐을 수 있다 — 서명을 지워야 renderSwapUI가
+  // "안 바뀜"으로 착각해 건너뛰지 않고 투표 카드와 입력 잠금을 다시 그린다.
+  swapSig = null;
+  // 오프라인이면 onCon이 이미 잠금 화면(끊김 안내 + 입력 잠금)을 만들어놨다 — 여기서 다시
+  // 그리면 renderMulti의 mSay가 그 안내를 덮어써 버린다.
+  if(MG.meta && MG.online !== false) renderMulti();
+}
+
+function submitNick(){
+  const editing = MG.nickEditing;
+  const r = nickChange(editing ? MG.name : '', $('multi-nick-input').value);
+  if(!r.ok){ $('multi-nick-input').focus(); return; }
+  if(r.changed){
+    saveNick(r.name);
+    MG.name = r.name;
+    // set이 아니라 update — set은 ts를 지워 재접속 판정 데이터를 잃는다.
+    if(editing) MG.ref.child('presence/' + MG.uid).update({ name: r.name });
+  }
+  closeNick();
+  if(!editing) enterRoom();
+}
+
+function openNickEdit(){
+  if(!MG || MG.nickEditing) return;
+  if(MG.online === false) return;              // 쓰기가 조용히 버려진다
+  if(MG.meta && MG.meta.swap) return;          // 교체 투표 중 — 이미 입력이 잠긴 구간
+  askNick('edit');
 }
 
 function enterRoom(){
@@ -1687,6 +1732,7 @@ function enterRoom(){
       $('multi-swap').innerHTML = '';
       $('multi-swap-card').classList.add('hidden');
       $('multi-swap-card').innerHTML = '';
+      if(MG.nickEditing) closeNick();
       swapSig = null;
     }else{
       const me2 = MG.ref.child('presence/' + MG.uid);
@@ -1703,10 +1749,15 @@ function renderPlayers(){
   const el = $('multi-players');
   el.innerHTML = '';
   for(const m of MG.members){
+    const isMe = m.uid === MG.uid;
     const chip = document.createElement('div');
-    chip.className = 'pchip' + (m.uid===MG.uid ? ' me' : '');
-    chip.innerHTML = '<span>' + (m.uid===MG.uid ? '나' : escapeHtml(m.name||'?')) +
-                     '</span><span class="pscore">' + (scores[m.uid]||0) + '</span>';
+    chip.className = 'pchip' + (isMe ? ' me' : '');
+    // 내 칩에는 실제 이름을 보여준다 — 남들에게 어떻게 보이는지 확인할 유일한 곳이고,
+    // 이름을 바꾼 뒤 반영됐는지도 여기서 확인한다.
+    const label = isMe
+      ? (MG.name ? escapeHtml(MG.name) + '(나)' : '나') + ' ✏️'
+      : escapeHtml(m.name || '?');
+    chip.innerHTML = '<span>' + label + '</span><span class="pscore">' + (scores[m.uid]||0) + '</span>';
     el.appendChild(chip);
   }
   $('multi-myscore').textContent = scores[MG.uid] || 0;
@@ -1774,8 +1825,9 @@ function renderMulti(){
   // MG.online은 첫 .info/connected 이벤트 전까지 undefined다. 아직 모르는 상태는
   // 온라인으로 취급해 새 세션이 시작부터 잠기지 않게 하고, 명시적 false일 때만 잠근다.
   const online = MG.online !== false;
+  const editing = MG.nickEditing === true;
   if(m.phase === 'play'){
-    if(online){
+    if(online && !editing){
       $('multi-input').disabled = false;
       $('multi-submit').disabled = false;
       if(MG.mode==='chain') mSay('자, ‘<b>' + escapeHtml(m.need||'') + '</b>’로 시작하는 낱말!');
@@ -1847,7 +1899,8 @@ async function submitMulti(){
     const m2 = MG.meta;
     if(!m2 || m2.phase !== 'play'){ mFeedback(''); return; }   // 이미 라운드가 끝남 → 조용히
     const _sig = swapSigOf();
-    if(_sig === 'idle' || _sig === 'cooldown' || _sig === 'inactive') $('multi-submit').disabled = false;
+    // 위키 확인하는 동안 닉네임 편집 폼이 열렸을 수 있다 — 그럴 땐 확인 버튼을 되살리면 안 된다.
+    if(!MG.nickEditing && (_sig === 'idle' || _sig === 'cooldown' || _sig === 'inactive')) $('multi-submit').disabled = false;
     if(found){ addUserWord(word); bad = null; }                // 위키 확인 → 로컬 사전에 저장, 통과
     else bad = 'notindict';
   }
@@ -1934,6 +1987,7 @@ function myVote(){
 }
 function askSwap(){
   const m = MG.meta; if(!m || m.phase!=='play') return;
+  if(MG.nickEditing) return;                     // 이름 편집 중엔 교체 요청도 막는다
   if(m.swapCool && Date.now() < m.swapCool) return;
   // 요청을 먼저 확정하고, 확정된 until을 req로 삼아 자동 찬성표를 던진다.
   MG.ref.child('meta').transaction(cur=>{
@@ -2038,7 +2092,8 @@ function renderSwapUI(){
         el.innerHTML = '<button class="btn btn-soft" id="multi-swap-ask">🔄 문제 교체 요청</button>';
         $('multi-swap-ask').addEventListener('click', askSwap);
         // renderSwapUI는 1초 tick에서도 불리므로 renderMulti의 활성화에 의존하지 말고 여기서 직접 켠다.
-        $('multi-input').disabled = false; $('multi-submit').disabled = false;
+        // 단, 닉네임 편집 폼이 열려 있으면 여기서 풀면 안 된다 — nickEditing으로 게이팅한다.
+        if(!MG.nickEditing){ $('multi-input').disabled = false; $('multi-submit').disabled = false; }
       }
     }
     tallySwap();
@@ -2164,8 +2219,14 @@ $('modepick-multi').addEventListener('click', ()=>{
   startMulti(modePickMode);
 });
 $('modepick-close').addEventListener('click', closeModePick);
+// renderPlayers가 presence/meta/scores마다 칩을 통째로 새로 그리므로, 칩 자체에 리스너를
+// 달면 탭이 재렌더링 사이에 낀 순간 유령 노드에 떨어져 씹힌다 — 컨테이너에 한 번만 위임한다.
+$('multi-players').addEventListener('click', e=>{
+  if(e.target.closest('.pchip.me')) openNickEdit();
+});
 $('multi-nick-ok').addEventListener('click', submitNick);
 $('multi-nick-input').addEventListener('keydown', e=>{ if(e.key==='Enter') submitNick(); });
+$('multi-nick-cancel').addEventListener('click', closeNick);
 $('btn-multi-home').addEventListener('click', leaveMulti);
 $('multi-end-x').addEventListener('click', leaveMulti);
 $('multi-home2').addEventListener('click', leaveMulti);

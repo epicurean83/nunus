@@ -646,6 +646,152 @@ try{
     }
   }
 
+  /* 3.5) 이름 변경 — 편집 중 게임 입력이 잠기고, 상대에게 새 이름이 전파된다 */
+  {
+    info('이름 변경: A가 라운드 진행 중 칩을 탭해 이름을 바꾼다');
+    await waitPhase(A.page, 'play', 8000).catch(() => {});
+
+    const uidA = await A.page.evaluate(() => MG.uid);
+    const oldName = await A.page.evaluate(() => MG.name);
+
+    // 내 칩(.pchip.me)을 실제로 클릭한다 — 진입점 자체가 동작하는지 보기 위해
+    // openNickEdit()를 직접 부르지 않는다.
+    await A.page.click('.pchip.me');
+    const opened = await waitFor(A.page,
+      () => !document.getElementById('multi-nick').classList.contains('hidden'),
+      [], { timeout: 3000, label: '이름 입력창이 열림' }).catch(() => false);
+    report('내 칩을 탭하면 이름 입력창이 열림', !!opened);
+
+    const prefilled = await A.page.$eval('#multi-nick-input', e => e.value);
+    report('입력창에 현재 이름이 미리 채워짐', prefilled === oldName, prefilled + ' vs ' + oldName);
+
+    // 게이팅 검증: 편집 중에 라운드가 넘어가도 게임 입력창이 되살아나면 안 된다.
+    //
+    // 그냥 기다리기만 하면 renderMulti를 부를 이벤트가 없어서 게이팅이 없어도 통과해
+    // 버린다(리스너가 안 불리면 입력창을 되살릴 기회 자체가 없다). 그래서 B가 실제로
+    // 정답을 제출해 meta를 바꾸고, A의 meta 리스너 → renderMulti → play 분기를
+    // 확실히 태운 뒤에 확인한다.
+    const roundBeforeEdit = await round(A.page);
+    const needForB = await need(B.page);
+    const usedForB = await B.page.evaluate(() => Object.values((MG.meta && MG.meta.chain) || {}));
+    const wordForB = await B.page.evaluate((nn, u) => findHint(nn, WORD_ALL, u), needForB, usedForB);
+    if (wordForB){
+      await B.page.type('#multi-input', wordForB);
+      await B.page.click('#multi-submit');
+      // reveal(3초) → 다음 라운드까지 기다린다. A는 그동안 편집창을 연 채로 있다.
+      await waitFor(A.page, (r) => String(MG.meta.round) !== r && MG.meta.phase === 'play',
+        [roundBeforeEdit], { timeout: 12000, label: 'A가 다음 라운드 play를 봄' });
+    } else {
+      info('경고: B가 이을 낱말을 못 찾아 라운드 전환 없이 검사한다(게이팅 검증이 약해짐)');
+      await sleep(3500);
+    }
+
+    const lockedDuringEdit = await A.page.$eval('#multi-input', e => e.disabled);
+    report('편집 중에는 게임 입력창이 잠긴 채 유지됨(renderMulti가 되살리지 못함)',
+      lockedDuringEdit === true, 'disabled=' + lockedDuringEdit);
+    const stillOpen = await A.page.evaluate(
+      () => !document.getElementById('multi-nick').classList.contains('hidden'));
+    report('라운드가 넘어가도 편집창은 열린 채 유지됨', stillOpen === true);
+
+    // 이름 변경
+    const newName = '라라';
+    await A.page.$eval('#multi-nick-input', e => { e.value = ''; });
+    await A.page.type('#multi-nick-input', newName);
+    await A.page.click('#multi-nick-ok');
+
+    const closed = await waitFor(A.page,
+      () => document.getElementById('multi-nick').classList.contains('hidden'),
+      [], { timeout: 3000, label: '이름 입력창이 닫힘' }).catch(() => false);
+    report('바꾸기를 누르면 입력창이 닫힘', !!closed);
+
+    // 상대에게 전파됐는지는 UI 문구가 아니라 동기화된 presence 데이터로 확인한다.
+    const seenByB = await waitFor(B.page,
+      (u, n) => !!(MG.members || []).find(m => m.uid === u && m.name === n),
+      [uidA, newName], { timeout: 5000, label: 'B가 새 이름을 봄' }).catch(() => false);
+    report('바뀐 이름이 상대(B)에게 전파됨', !!seenByB,
+      seenByB ? oldName + ' → ' + newName : 'B가 5초 내에 새 이름을 못 봄');
+
+    const chipText = await A.page.$eval('.pchip.me', e => e.textContent);
+    report('내 칩에 새 이름이 보임', chipText.includes(newName), chipText.trim());
+
+    // ts가 살아 있어야 한다 — update가 아니라 set을 썼다면 여기서 사라진다.
+    const tsAlive = await A.page.evaluate((u) => new Promise(res =>
+      firebase.database().ref('nunus/chain/presence/' + u).once('value',
+        s => res(!!(s.val() && s.val().ts)))), uidA);
+    report('이름만 바뀌고 presence의 ts는 보존됨', tsAlive === true);
+
+    // 편집을 닫은 뒤 실제로 다시 제출할 수 있어야 한다.
+    await waitPhase(A.page, 'play', 8000).catch(() => {});
+    const unlocked = await waitFor(A.page,
+      () => document.getElementById('multi-input').disabled === false,
+      [], { timeout: 6000, label: '게임 입력창 재활성화' }).catch(() => false);
+    report('편집을 닫으면 게임 입력창이 다시 열림', !!unlocked);
+
+    const n = await need(A.page);
+    const chainArr = await A.page.evaluate(() => Object.values((MG.meta && MG.meta.chain) || {}));
+    const word = await A.page.evaluate((nn, u) => findHint(nn, WORD_ALL, u), n, chainArr);
+    if (word){
+      await A.page.type('#multi-input', word);
+      await A.page.click('#multi-submit');
+      await sleep(1200);
+      const b = await bub(A.page);
+      report('이름 변경 후에도 실제 제출이 성공함', b.includes('이겼어요'), b.slice(0, 30));
+    } else {
+      report('이름 변경 후에도 실제 제출이 성공함', false, '이을 낱말을 못 찾음');
+    }
+
+    // 다음 블록(호스트 승계)이 nick으로 A를 식별하지 않도록 최신 값을 반영해 둔다.
+    A.nick = newName;
+    gameIdsUsed.add(await A.page.evaluate(() => MG.meta.gameId));
+  }
+
+  /* 3.6) 편집 폼이 열린 채로 시작된 교체 투표 — 폼을 닫아도 투표 잠금이 살아있어야 한다 */
+  {
+    info('편집 폼을 연 뒤에 교체 투표가 시작되면, 폼을 닫을 때 잠금이 되살아나는지 확인');
+    await waitPhase(A.page, 'play', 8000).catch(() => {});
+    await waitPhase(B.page, 'play', 8000).catch(() => {});
+
+    // 진짜 클릭으로 편집 폼을 연다 — 위임 리스너 경유로도 진입점이 살아있는지 재확인한다.
+    await A.page.click('.pchip.me');
+    const editOpened = await waitFor(A.page,
+      () => !document.getElementById('multi-nick').classList.contains('hidden'),
+      [], { timeout: 3000, label: '이름 입력창이 열림(투표 잠금 시나리오)' }).catch(() => false);
+    report('교체 투표 잠금 시나리오: 칩 탭으로 편집 폼이 열림', !!editOpened);
+
+    // 편집 폼이 열려 있는 동안 B가 교체 투표를 시작한다 — UI를 거치지 않고 직접 호출한다.
+    await B.page.evaluate(() => askSwap());
+
+    const swapSeenWhileEditing = await waitFor(A.page, () => !!(MG.meta && MG.meta.swap), [],
+      { timeout: 5000, label: '편집 중인 A가 교체 투표를 인지함' }).catch(() => false);
+    report('편집 폼이 열린 채로도 A가 교체 투표를 인지함', !!swapSeenWhileEditing);
+
+    // 이름을 바꾸고 폼을 닫는다 — closeNick()이 swapSig를 지워야 renderSwapUI가
+    // "구조 안 바뀜"으로 착각해 잠금을 되살리지 못하는 사고가 없다(이 리셋이 없으면,
+    // 편집 중 이미 한 번 그려진 voter 서명과 지금 서명이 같아 보여 재렌더를 건너뛰고
+    // 위쪽 phase==='play' 분기가 켜놓은 입력이 그대로 살아남는다).
+    await A.page.$eval('#multi-nick-input', e => { e.value = ''; });
+    await A.page.type('#multi-nick-input', '모모');
+    await A.page.click('#multi-nick-ok');
+
+    const editClosed = await waitFor(A.page,
+      () => document.getElementById('multi-nick').classList.contains('hidden'),
+      [], { timeout: 3000, label: '이름 입력창이 닫힘(투표 잠금 시나리오)' }).catch(() => false);
+    report('투표 중에도 바꾸기를 누르면 편집 폼이 닫힘', !!editClosed);
+
+    const lockedAfterClose = await A.page.$eval('#multi-input', e => e.disabled);
+    report('편집 폼을 닫아도 진행 중인 교체 투표가 게임 입력을 계속 잠금(swapSig 리셋 검증)',
+      lockedAfterClose === true, 'disabled=' + lockedAfterClose);
+
+    // 뒷 블록(호스트 승계)이 깨끗한 상태에서 시작하도록 투표를 정리한다 — A가 명시적으로
+    // 거부해 'cancel'로 즉시 끝낸다(20초 묵시적 동의를 기다리지 않는다).
+    await A.page.evaluate(() => voteSwap(false));
+    await waitFor(A.page, () => !(MG.meta && MG.meta.swap), [],
+      { timeout: 5000, label: '투표 정리(거부) 반영' }).catch(() => {});
+
+    A.nick = '모모';
+    gameIdsUsed.add(await A.page.evaluate(() => MG.meta.gameId));
+  }
+
   /* 4) 호스트 승계 — 호스트가 탭을 닫아도 남은 쪽이 진행 */
   {
     const hostIsA = await A.page.evaluate(() => isHost());

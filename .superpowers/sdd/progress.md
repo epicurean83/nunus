@@ -141,3 +141,48 @@ Task 10: complete — 배포됨 (hosting + database)
 opus 리뷰: Important 1(오프라인 시 카드 미정리 회귀) + Minor 1(await 후 submit 무조건 재활성) 발견 -> 수정.
   fail-before/pass-after로 둘 다 증명. 66/66 유지. 솔로 무손상. commits 3b1de68, 24de347.
 Minor(미해결, 기존/스코프밖): wikiHasWord가 일시적 네트워크 실패 시 false 캐시 -> 세션 내 실재어 거부(solo도 동일).
+
+=== 이름 변경 + 간격 조정 (2026-07-21, feature/multi-nick-edit) ===
+Task 1: complete (commits 8ef9e1f..b0dc346, review clean) — .players/.pchip.me/.swap-card CSS
+Task 2: complete (commits b0dc346..8ded975, review clean) — nickChange를 CORE에 추가, 테스트 66->71
+  리뷰가 TDD fail-first 증거를 의심 -> 컨트롤러가 직접 재현: 함수명을 바꾸면 정확히 5 fail/66 pass.
+  테스트는 진짜로 구현을 검증함. 리포트 서술 문제였고 코드 결함 아님.
+  Minor(미해결): nickChange는 current가 이미 정규화됐다고 가정. 호출부(MG.name)는 항상 norm된
+  값만 담으므로 실질 무해.
+Task 3: complete (commits 8ded975..255341f, review clean) — 내 칩에 이름+(나)+연필, escapeHtml 유지
+Task 4: complete (commits 255341f..53c6fb5, 3 commits, review clean on 3rd pass)
+  편집 UI(askNick enter/edit, closeNick, openNickEdit) + presence update(set 아님) + nickEditing 게이팅.
+  opus 리뷰 1차 Critical 1: renderSwapUI의 idle 분기가 1초 tick에서 입력창을 직접 켜서 게이팅 우회
+    (라운드 전환/쿨다운 만료 두 경로). 계획이 이 경로를 놓쳤음 -> 게이팅 추가. commit 1edadf9
+  opus 리뷰 1차 Important 1: closeNick의 renderMulti가 오프라인 문구를 덮음 -> online 조건 추가.
+  opus 리뷰 2차 Important 2: (a) 위키 조회 await 후 submit 재활성이 편집 무시 -> nickEditing 가드
+    (b) 편집 중 투표 시작 시 swapSig 캐시 때문에 닫을 때 입력이 열린 채 남음 -> closeNick에서
+    swapSig=null로 강제 재평가(오프라인 분기와 같은 기존 패턴). commit 53c6fb5
+  입력창을 켜는 지점은 총 3곳(renderMulti play / submitMulti 위키 후 / renderSwapUI idle), 전부 게이팅됨.
+  Minor(미해결, 최종 리뷰 트리아지 대상):
+   1. 편집 중 reveal/over 렌더가 말풍선을 덮음(스펙 4절이 의도한 대로 게이팅 안 함)
+   2. openNickEdit에 MG.ref/MG.uid 널가드 없음(현재 도달 불가)
+   3. closeNick에 !MG 가드 없음(현재 도달 불가)
+   4. 편집 중에도 교체 요청 버튼은 클릭 가능(스펙은 게임 입력만 잠그도록 요구)
+   5. closeNick이 투표 진행 중이면 "20초 뒤" 문구를 경과 시간 무시하고 재공지
+Task 5: complete (commits 53c6fb5..c7d0fcc, review clean) — multi-race.mjs에 이름변경 시나리오 추가
+  fail-before(게이팅 제거): 정확히 1개 FAIL, 그 1개가 의도한 항목(disabled=false). pass-after: 전항목 PASS, exit 0.
+  Minor: A.nick 갱신 주석이 부정확(호스트 승계 블록은 nick을 안 읽음). 무해.
+컨트롤러 육안 검증(로컬 8777, claude-in-chrome): 최초 입장 모드(취소 숨김/라벨 "입장") 정상.
+  칩 "가가(나) ✏️", cursor:pointer. 칩 탭 -> 편집 열림(값 미리채움, 라벨 "바꾸기", 취소 노출,
+  게임 입력 disabled). 공백만 입력 후 바꾸기 -> 닫히지 않음. 취소 -> 이름 유지, 입력 복귀, 말풍선 복귀.
+  간격: 칩 아래 여백 2px -> 12px 실측. 교체 카드 위 16px / 아래 12px 실측(스크린샷 확인).
+  테스트 후 RTDB 정리 완료(null).
+최종 whole-branch 리뷰(opus): SHIP. Important 2건 발견 -> 수정(commit 9d32569):
+  1. renderPlayers가 매 이벤트마다 칩을 innerHTML로 재생성 -> 칩에 직접 붙인 클릭 리스너가
+     탭 도중 사라질 수 있음(기능의 유일한 진입점). #multi-players에 위임 리스너 1개로 교체.
+  2. closeNick의 swapSig=null(편집 중 시작된 투표를 닫을 때 재평가)에 테스트가 없었음 ->
+     multi-race.mjs에 시나리오 추가. fail-before: 그 줄만 되돌리면 새 단언 1개만 FAIL(disabled=false).
+  덤: 편집 중 🔄 교체 요청 버튼 클릭 차단(askSwap 조기 반환).
+재리뷰(opus): 3건 모두 closed, 신규 결함 없음. SHIP.
+Minor/Important(미해결, 후속 티켓 대상):
+ - [Important, 기존 결함/스코프밖] renderMulti의 play 분기는 입력을 무조건 켜고 renderSwapUI는
+   시그니처가 "바뀐" 경우에만 다시 잠근다 -> 투표 중 presence/scores 이벤트가 오면 남은 투표
+   시간 동안 입력이 열린 채 남는다. closeNick 사례만 이번에 막았고 일반 케이스는 남아 있음.
+   근본 해결책: 입력 잠금 판단을 syncInputLock() 한 곳으로 모으기(세 곳에 흩어져 있음).
+ - Task 4 Minor 5건은 전부 "ship" 판정(도달 불가하거나 미관 문제). 상세는 위 Task 4 항목 참조.

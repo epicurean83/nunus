@@ -9,7 +9,7 @@ const CORE_NAMES = [
   'chainCheck','WORD_DICT','isHangulSyllable','SEED_WORDS',
   'hintStages','hintDisplay','hasContinuation','findHint',
   'chosungOf','chosungHint',
-  'pickHost','swapOutcome'
+  'pickHost','swapOutcome','nickChange'
 ];
 
 function loadCore(){
@@ -538,4 +538,36 @@ test('public/index.html: 문제 교체 요청 배선', () => {
   assert.match(html, /SWAP_COOL_MS/, '거부 쿨다운 상수를 써야');
   // 표는 presence 아래에만
   assert.match(html, /presence\/'\s*\+\s*MG\.uid\s*\+\s*'\/vote/, '표는 내 presence 아래에 써야');
+});
+
+test('nickChange: 앞뒤 공백을 지우고 받아들인다', () => {
+  const { nickChange } = loadCore();
+  assert.deepEqual(nickChange('가가', ' 나나 '), { ok:true, changed:true, name:'나나' });
+});
+
+test('nickChange: 12자를 넘으면 자른다', () => {
+  const { nickChange } = loadCore();
+  const r = nickChange('가가', '가나다라마바사아자차카타파하');
+  assert.equal(r.ok, true);
+  assert.equal(r.name, '가나다라마바사아자차카타');
+  assert.equal(r.name.length, 12);
+});
+
+test('nickChange: 빈 값과 공백만 있는 입력은 거부한다', () => {
+  const { nickChange } = loadCore();
+  assert.deepEqual(nickChange('가가', ''),     { ok:false, changed:false, name:'' });
+  assert.deepEqual(nickChange('가가', '   '),  { ok:false, changed:false, name:'' });
+  assert.deepEqual(nickChange('가가', null),   { ok:false, changed:false, name:'' });
+});
+
+test('nickChange: 현재 이름과 같으면 changed=false', () => {
+  const { nickChange } = loadCore();
+  assert.deepEqual(nickChange('가가', '가가'),   { ok:true, changed:false, name:'가가' });
+  assert.deepEqual(nickChange('가가', ' 가가 '), { ok:true, changed:false, name:'가가' });
+});
+
+test('nickChange: 최초 입장(현재 이름 없음)은 항상 changed=true', () => {
+  const { nickChange } = loadCore();
+  assert.deepEqual(nickChange('', '가가'),        { ok:true, changed:true, name:'가가' });
+  assert.deepEqual(nickChange(undefined, '가가'), { ok:true, changed:true, name:'가가' });
 });
