@@ -626,3 +626,15 @@ test('inputLock: busy 말고는 input과 submit이 갈리지 않는다', () => {
       JSON.stringify({ phase, online, editing, voting }) + ' → ' + JSON.stringify(r));
   }
 });
+
+test('inputLock: 알 수 없는 온라인 상태(undefined 또는 누락)는 둘 다 닫힌다', () => {
+  const { inputLock } = loadCore();
+  // online: undefined이면 닫혀야 함
+  assert.deepEqual(
+    inputLock({ phase:'play', online:undefined, editing:false, busy:false, voting:false }),
+    { input:false, submit:false }, 'online: undefined');
+  // online 키를 완전히 생략하면 닫혀야 함
+  assert.deepEqual(
+    inputLock({ phase:'play', editing:false, busy:false, voting:false }),
+    { input:false, submit:false }, 'online: 누락');
+});
