@@ -558,6 +558,7 @@
           <input class="type-input" id="multi-nick-input" type="text" maxlength="12"
                  autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="닉네임 (1~12자)">
           <button class="btn btn-sky" id="multi-nick-ok" style="flex:none; min-height:auto; padding:0 20px">입장</button>
+          <button class="btn btn-soft hidden" id="multi-nick-cancel" style="flex:none; min-height:auto; padding:0 16px">취소</button>
         </div>
       </div>
 
@@ -1605,7 +1606,7 @@ function fbInit(){
 }
 
 function startMulti(mode){
-  MG = { mode, uid:null, name:loadNick(), ref:null, members:[], meta:null, hostUid:null, subs:[], allScores:{}, scoreCache:{} };
+  MG = { mode, uid:null, name:loadNick(), ref:null, members:[], meta:null, hostUid:null, subs:[], allScores:{}, scoreCache:{}, nickEditing:false };
   swapSig = null;
   $('multi-title').textContent = (MODE_LABEL[mode]||'') + ' · 같이';
   $('multi-problem-chain').classList.toggle('hidden', mode!=='chain');
@@ -1620,24 +1621,56 @@ function startMulti(mode){
   fbInit().then(uid=>{
     MG.uid = uid;
     MG.ref = firebase.database().ref('nunus/' + mode);
-    if(!MG.name){ askNick(); } else { enterRoom(); }
+    if(!MG.name){ askNick('enter'); } else { enterRoom(); }
   }).catch(()=>{
     mSay('지금은 같이 하기가 안 돼. 혼자 하기로 놀자!');
   });
 }
 
-function askNick(){
+function askNick(mode){
+  const edit = mode === 'edit';
+  MG.nickEditing = edit;
   $('multi-nick').classList.remove('hidden');
-  mSay('같이 하려면 이름이 필요해! 뭐라고 부를까?');
-  $('multi-nick-input').value = '';
+  $('multi-nick-input').value = edit ? MG.name : '';
+  $('multi-nick-ok').textContent = edit ? '바꾸기' : '입장';
+  $('multi-nick-cancel').classList.toggle('hidden', !edit);
+  mSay(edit ? '새 이름을 뭐라고 할까?' : '같이 하려면 이름이 필요해! 뭐라고 부를까?');
+  if(edit){
+    // 편집 중에는 게임 입력을 잠근다. renderMulti가 되살리지 못하도록 nickEditing으로 게이팅됨.
+    $('multi-input').disabled = true;
+    $('multi-submit').disabled = true;
+  }
   $('multi-nick-input').focus();
+  if(edit) $('multi-nick-input').select();
 }
-function submitNick(){
-  const v = norm($('multi-nick-input').value).slice(0,12);
-  if(!v){ $('multi-nick-input').focus(); return; }
-  saveNick(v); MG.name = v;
+
+// 편집 상태를 걷고 화면을 원래대로 돌린다(확정·취소·오프라인 모두 이 경로).
+function closeNick(){
+  MG.nickEditing = false;
   $('multi-nick').classList.add('hidden');
-  enterRoom();
+  $('multi-nick-cancel').classList.add('hidden');
+  if(MG.meta) renderMulti();
+}
+
+function submitNick(){
+  const editing = MG.nickEditing;
+  const r = nickChange(editing ? MG.name : '', $('multi-nick-input').value);
+  if(!r.ok){ $('multi-nick-input').focus(); return; }
+  if(r.changed){
+    saveNick(r.name);
+    MG.name = r.name;
+    // set이 아니라 update — set은 ts를 지워 재접속 판정 데이터를 잃는다.
+    if(editing) MG.ref.child('presence/' + MG.uid).update({ name: r.name });
+  }
+  closeNick();
+  if(!editing) enterRoom();
+}
+
+function openNickEdit(){
+  if(!MG || MG.nickEditing) return;
+  if(MG.online === false) return;              // 쓰기가 조용히 버려진다
+  if(MG.meta && MG.meta.swap) return;          // 교체 투표 중 — 이미 입력이 잠긴 구간
+  askNick('edit');
 }
 
 function enterRoom(){
@@ -1694,6 +1727,7 @@ function enterRoom(){
       $('multi-swap').innerHTML = '';
       $('multi-swap-card').classList.add('hidden');
       $('multi-swap-card').innerHTML = '';
+      if(MG.nickEditing) closeNick();
       swapSig = null;
     }else{
       const me2 = MG.ref.child('presence/' + MG.uid);
@@ -1719,6 +1753,7 @@ function renderPlayers(){
       ? (MG.name ? escapeHtml(MG.name) + '(나)' : '나') + ' ✏️'
       : escapeHtml(m.name || '?');
     chip.innerHTML = '<span>' + label + '</span><span class="pscore">' + (scores[m.uid]||0) + '</span>';
+    if(isMe) chip.addEventListener('click', openNickEdit);
     el.appendChild(chip);
   }
   $('multi-myscore').textContent = scores[MG.uid] || 0;
@@ -1786,8 +1821,9 @@ function renderMulti(){
   // MG.online은 첫 .info/connected 이벤트 전까지 undefined다. 아직 모르는 상태는
   // 온라인으로 취급해 새 세션이 시작부터 잠기지 않게 하고, 명시적 false일 때만 잠근다.
   const online = MG.online !== false;
+  const editing = MG.nickEditing === true;
   if(m.phase === 'play'){
-    if(online){
+    if(online && !editing){
       $('multi-input').disabled = false;
       $('multi-submit').disabled = false;
       if(MG.mode==='chain') mSay('자, ‘<b>' + escapeHtml(m.need||'') + '</b>’로 시작하는 낱말!');
@@ -2178,6 +2214,7 @@ $('modepick-multi').addEventListener('click', ()=>{
 $('modepick-close').addEventListener('click', closeModePick);
 $('multi-nick-ok').addEventListener('click', submitNick);
 $('multi-nick-input').addEventListener('keydown', e=>{ if(e.key==='Enter') submitNick(); });
+$('multi-nick-cancel').addEventListener('click', closeNick);
 $('btn-multi-home').addEventListener('click', leaveMulti);
 $('multi-end-x').addEventListener('click', leaveMulti);
 $('multi-home2').addEventListener('click', leaveMulti);
