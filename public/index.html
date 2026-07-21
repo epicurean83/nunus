@@ -1649,6 +1649,9 @@ function closeNick(){
   MG.nickEditing = false;
   $('multi-nick').classList.add('hidden');
   $('multi-nick-cancel').classList.add('hidden');
+  // 편집 폼이 열린 사이 교체 투표가 새로 시작됐을 수 있다 — 서명을 지워야 renderSwapUI가
+  // "안 바뀜"으로 착각해 건너뛰지 않고 투표 카드와 입력 잠금을 다시 그린다.
+  swapSig = null;
   // 오프라인이면 onCon이 이미 잠금 화면(끊김 안내 + 입력 잠금)을 만들어놨다 — 여기서 다시
   // 그리면 renderMulti의 mSay가 그 안내를 덮어써 버린다.
   if(MG.meta && MG.online !== false) renderMulti();
@@ -1897,7 +1900,8 @@ async function submitMulti(){
     const m2 = MG.meta;
     if(!m2 || m2.phase !== 'play'){ mFeedback(''); return; }   // 이미 라운드가 끝남 → 조용히
     const _sig = swapSigOf();
-    if(_sig === 'idle' || _sig === 'cooldown' || _sig === 'inactive') $('multi-submit').disabled = false;
+    // 위키 확인하는 동안 닉네임 편집 폼이 열렸을 수 있다 — 그럴 땐 확인 버튼을 되살리면 안 된다.
+    if(!MG.nickEditing && (_sig === 'idle' || _sig === 'cooldown' || _sig === 'inactive')) $('multi-submit').disabled = false;
     if(found){ addUserWord(word); bad = null; }                // 위키 확인 → 로컬 사전에 저장, 통과
     else bad = 'notindict';
   }
