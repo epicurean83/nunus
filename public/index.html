@@ -574,8 +574,8 @@
         <div id="multi-swap-card" class="swap-card hidden"></div>
         <div class="type-input-row">
           <input class="type-input" id="multi-input" type="text" inputmode="text"
-                 autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="낱말 입력">
-          <button class="btn btn-sky" id="multi-submit" style="flex:none; min-height:auto; padding:0 20px">확인</button>
+                 autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="낱말 입력" disabled>
+          <button class="btn btn-sky" id="multi-submit" style="flex:none; min-height:auto; padding:0 20px" disabled>확인</button>
         </div>
         <div class="chain-hint" id="multi-feedback"></div>
         <div class="actions" id="multi-swap"></div>
@@ -1616,6 +1616,7 @@ function fbInit(){
 function startMulti(mode){
   MG = { mode, uid:null, name:loadNick(), ref:null, members:[], meta:null, hostUid:null, subs:[], allScores:{}, scoreCache:{}, nickEditing:false };
   swapSig = null;
+  multiBusy = false;   // 지난 세션의 위키 확인이 끝나지 않은 채 나갔다가 다시 들어와도 확인 버튼이 열려야 한다
   $('multi-title').textContent = (MODE_LABEL[mode]||'') + ' · 같이';
   $('multi-problem-chain').classList.toggle('hidden', mode!=='chain');
   $('multi-problem-chosung').classList.toggle('hidden', mode!=='chosung');
@@ -1748,16 +1749,22 @@ function enterRoom(){
   MG.subs.push(()=> conRef.off('value', onCon));
 }
 
-// MG의 현재 상태를 읽어 게임 입력의 잠금을 맞춘다. disabled를 직접 건드리는 곳은 이 함수뿐이다.
-function syncInputLock(){
+// syncInputLock과 submitMulti가 같은 다섯 값을 같은 방식으로 뽑아 쓰도록 한 곳에 모은다.
+// 따로 베껴 쓰면 조건이 하나 늘 때 한쪽에서 빠뜨리는 사고가 또 난다(실제로 있었던 문제).
+function lockState(){
   const m = MG && MG.meta;
-  const st = inputLock({
+  return {
     phase:   m ? m.phase : null,
     online:  !MG || MG.online !== false,   // 첫 .info/connected 전(undefined)은 온라인으로 본다
     editing: !!(MG && MG.nickEditing),
     busy:    multiBusy,
     voting:  !!(m && m.swap)
-  });
+  };
+}
+
+// MG의 현재 상태를 읽어 게임 입력의 잠금을 맞춘다. disabled를 직접 건드리는 곳은 이 함수뿐이다.
+function syncInputLock(){
+  const st = inputLock(lockState());
   $('multi-input').disabled  = !st.input;
   $('multi-submit').disabled = !st.submit;
 }
@@ -1894,8 +1901,10 @@ function checkMultiAnswer(word){
 
 async function submitMulti(){
   const m = MG && MG.meta;
-  if(!m || m.phase !== 'play') return;
-  if(multiBusy) return;                          // 위키 확인 중 중복 제출 방지
+  // DOM 잠금(#multi-submit disabled)과 똑같은 owner(inputLock)한테 다시 물어본다 — disabled가
+  // 어떤 이유로든 stale해져도(교체투표 중, 위키 확인 중 중복 제출 등) 여기서 한 번 더 막는다.
+  // DOM 잠금 뒤에 세우는 2차 방어선일 뿐, 판단 기준 자체는 여기서 새로 만들지 않는다.
+  if(!inputLock(lockState()).submit) return;
   const word = norm($('multi-input').value);
   if(!word){ $('multi-input').focus(); return; }
 
