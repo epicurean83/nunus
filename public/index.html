@@ -1649,7 +1649,9 @@ function closeNick(){
   MG.nickEditing = false;
   $('multi-nick').classList.add('hidden');
   $('multi-nick-cancel').classList.add('hidden');
-  if(MG.meta) renderMulti();
+  // 오프라인이면 onCon이 이미 잠금 화면(끊김 안내 + 입력 잠금)을 만들어놨다 — 여기서 다시
+  // 그리면 renderMulti의 mSay가 그 안내를 덮어써 버린다.
+  if(MG.meta && MG.online !== false) renderMulti();
 }
 
 function submitNick(){
@@ -2086,7 +2088,8 @@ function renderSwapUI(){
         el.innerHTML = '<button class="btn btn-soft" id="multi-swap-ask">🔄 문제 교체 요청</button>';
         $('multi-swap-ask').addEventListener('click', askSwap);
         // renderSwapUI는 1초 tick에서도 불리므로 renderMulti의 활성화에 의존하지 말고 여기서 직접 켠다.
-        $('multi-input').disabled = false; $('multi-submit').disabled = false;
+        // 단, 닉네임 편집 폼이 열려 있으면 여기서 풀면 안 된다 — nickEditing으로 게이팅한다.
+        if(!MG.nickEditing){ $('multi-input').disabled = false; $('multi-submit').disabled = false; }
       }
     }
     tallySwap();
