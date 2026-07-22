@@ -833,6 +833,14 @@ function inputLock({ phase, online, editing, busy, voting }){
   const on = phase === 'play' && !!online && !editing && !voting;
   return { input: on, submit: on && !busy };
 }
+
+// 라운드를 넘길지 게임을 끝낼지. 끝말잇기는 이을 낱말이 없으면 라운드가 남아도 끝낸다
+// — 아무도 답할 수 없는 문제를 걸어두면 방이 그대로 멈춰버리기 때문이다.
+function chainRoundOutcome({ mode, round, maxRounds, need, used, words }){
+  if(round >= maxRounds) return 'over';
+  if(mode !== 'chain') return 'next';
+  return hasContinuation(need, words, used) ? 'next' : 'over';
+}
 /* CORE:END */
 
 const STORE_KEY_V1 = "nachmal.words.v1";
