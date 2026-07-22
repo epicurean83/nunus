@@ -233,3 +233,38 @@ Task 3: complete (commit 570a645, review clean) — multi-race.mjs에 3.7 투표
    증명하려면 A가 미지의 낱말을 제출해 await 중일 때 B가 askSwap하는 시나리오가 필요.
  - multi-race.mjs 플레이크(끝말잇기 사전에 이을 낱말이 없어 스위트 중단): 3회 중 1회꼴.
    유일한 통합 게이트를 흔들므로 고칠 가치 있음.
+Task 2: complete (commits aa84e52..461332a, review clean) — hostTick에서 chainRoundOutcome 판정,
+  renderMulti over 문구를 round<MULTI_ROUNDS로 분기(규칙이 새 meta 필드를 막으므로 추론).
+  opus 리뷰 Minor: 트랜잭션 콜백이 MG.mode를 읽는데 콜백이 재실행/지연되면 leaveMulti 이후
+   MG가 null일 수 있음(기존에도 있었지만 이번 diff가 첫 참조를 앞당김) -> mode를 콜백 밖에서
+   캡처. commit 461332a
+  Minor(미해결): (1) 마지막 라운드에서 막다르면 "게임 끝!"로 표시됨(10라운드를 다 쳤으므로 타당)
+   (2) newProblem의 `|| seeds[0]` 폴백은 이을 수 없는 seed를 낼 수 있고 그건 play 상태라
+   hostTick이 안 봄. 현재 SEED_WORDS 15개는 모두 이을 수 있어 도달 불가.
+Task 3: complete (commits 461332a..e331f9b, review clean) — acceptWord 막다른 분기에서 endChain(need),
+  endChain은 인자 유무로 막다른 종료 / X 종료를 가름. 구현자가 실제 브라우저로 5개 항목 확인.
+Task 4: complete (commits e331f9b..8ac82e3, review clean on 2nd pass) — 3.8 막다른 종료 시나리오 +
+  기존 플레이크 제거(이을 낱말 없을 때 throw -> 방을 끝내고 재시작 경로로).
+  fail-before: hostTick 판정만 손으로 되돌리면 의도한 단언이 FAIL(+연쇄 4건). pass-after: 전항목 PASS.
+  리뷰 Important: 3.8이 round를 고정 안 해서, 앞 블록들이 라운드를 10까지 올려놓으면 종료는
+   되지만 문구가 "게임 끝!"이 되어 정상 앱에서 단언이 실패(관측된 실행은 round=8, 여유 2).
+   -> 스테이징 트랜잭션에서 round=1로 고정. commit 8ac82e3
+  Minor(미해결): 후보 6글자 중 이을 수 없는 글자를 못 찾으면 skip이 아니라 6개 전부 FAIL 처리.
+   사전이 늘어 후보가 모두 유효해지면 거짓 실패가 된다.
+최종 whole-branch 리뷰(opus): SHIP. Critical 없음.
+ [Important, 미해결 — 의도적으로 그대로 배포] 소형 사전 호스트가 남의 게임을 조기 종료시킬 수 있음.
+   hostTick은 호스트의 WORD_ALL로 판정한다. 리뷰가 실측: 37k 사전에서 이을 수 있는 끝글자 789개 중
+   238개(30%)가 4k 내장 사전에서는 막다르게 보인다. words.v1.txt fetch에 실패한 클라이언트가
+   호스트가 되면 1~2라운드 만에 "더 이을 낱말이 없어!"로 방을 끝낼 수 있다.
+   발생 조건은 (fetch 실패 x 호스트)로 드물고, 실패해도 "다시 시작"으로 복구되는 우아한 실패다.
+   리뷰가 제시한 하드닝(window.__dictLoaded일 때만 over 판정)은 채택하지 않았다 — 그러면 사전이
+   안 실린 호스트의 방은 진짜 막다름에서 예전처럼 멈추게 되어, 이 작업의 목적(정지 제거)과 상충한다.
+   근본 해결은 사전 로드 실패 자체를 다루는 것(원장 상단에 기존 이슈로 기록됨).
+ Minor(미해결): 호스트의 개인 등록 낱말(userWords/위키 폴백)로만 이을 수 있는 need는 'next'로
+   판정되어 방이 정체될 수 있다(정지는 아님 — play 상태라 교체 투표가 열려 있다).
+ Minor(미해결): 종료 화면에서 X(끝내기)를 누르면 endChain()이 인자 없이 불려 막다른 종료 문구가
+   일반 문구로 덮인다. 기존 구조에서 온 것이고 미관 문제.
+ 확인된 것: meta.need를 쓰는 곳은 newProblem과 submitMulti 둘뿐이고 둘 다 판정 지점을 지난다.
+   newProblem의 `|| seeds[0]` 폴백은 SEED_WORDS 15개가 두 사전 모두에서 이을 수 있어 도달 불가(실측).
+   종료 사유 추론(round < MULTI_ROUNDS)은 모든 상태에서 성립. 혼자하기의 최고기록/등록 흐름 무손상.
+   초성게임 무영향.
