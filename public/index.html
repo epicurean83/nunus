@@ -1877,7 +1877,8 @@ function renderMulti(){
                                       score: (MG.scoreCache||{})[x.uid]||0 }))
                            .sort((a,b)=> b.score - a.score);
     const medal = ['🥇','🥈','🥉'];
-    $('multi-endtext').textContent = '게임 끝!';
+    const deadEnd = MG.mode === 'chain' && m.round < MULTI_ROUNDS;
+    $('multi-endtext').textContent = deadEnd ? '더 이을 낱말이 없어!' : '게임 끝!';
     $('multi-standings').innerHTML = rank.map((r,i)=>
       (medal[i]||'　') + ' ' + escapeHtml(r.name) + ' — ' + r.score).join('<br>');
     mSay(rank.length ? (escapeHtml(rank[0].name) + ' 우승! 다시 할까?') : '게임 끝!');
@@ -1991,7 +1992,13 @@ function hostTick(){
     if(!MG || !isHost() || !MG.meta || MG.meta.phase !== 'reveal') return;
     MG.ref.child('meta').transaction(cur=>{
       if(!cur || cur.phase !== 'reveal') return;
-      if(cur.round >= MULTI_ROUNDS){ cur.phase = 'over'; return cur; }
+      // 이을 낱말이 없으면 라운드가 남아도 여기서 끝낸다. 판단은 호스트 한 명만 한다 —
+      // 참가자마다 사전이 다를 수 있어서(대용량 사전 로드 실패), 각자 판단하면 갈린다.
+      const outcome = chainRoundOutcome({
+        mode: MG.mode, round: cur.round, maxRounds: MULTI_ROUNDS,
+        need: cur.need, used: Object.keys(cur.used || {}), words: WORD_ALL
+      });
+      if(outcome === 'over'){ cur.phase = 'over'; return cur; }
       cur.round = cur.round + 1;
       cur.phase = 'play'; cur.winner = null; cur.winnerName = null; cur.answer = null;
       cur.startedAt = Date.now(); cur.swap = null;
