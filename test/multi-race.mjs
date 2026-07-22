@@ -336,7 +336,18 @@ try{
     }
     const chainArr = await A.page.evaluate(() => Object.values((MG.meta && MG.meta.chain) || {}));
     const word = await A.page.evaluate((n, u) => findHint(n, WORD_ALL, u), needBefore, chainArr);
-    if (!word) throw new Error('사전에서 "' + needBefore + '"로 이을 낱말을 못 찾음 — 사전 문제, 동시성 문제 아님');
+    if (!word){
+      // 이을 낱말이 없는 문제다 — 앱에서는 호스트가 라운드를 넘길 때 게임을 끝낸다.
+      // 여기서는 레이스 표본을 계속 모으려고 방을 끝내고 위쪽 재시작 경로로 보낸다.
+      info('시도 ' + attempts + ': "' + needBefore + '"로 이을 낱말이 없어 방을 끝내고 재시작');
+      await A.page.evaluate(() => MG.ref.child('meta').transaction(cur => {
+        if(!cur) return;
+        cur.phase = 'over';
+        return cur;
+      }));
+      await waitPhase(A.page, 'over', 5000).catch(() => {});
+      continue;
+    }
 
     const gameId = await A.page.evaluate(() => MG.meta.gameId);
     const scoresBefore = await readScores(A.page, gameId, 'chain');
@@ -834,6 +845,67 @@ try{
     await waitFor(A.page, () => !(MG.meta && MG.meta.swap), [],
       { timeout: 5000, label: '투표가 정리됨' }).catch(() => false);
     await sleep(600);
+  }
+
+  /* 3.8) 막다른 낱말 — 게임이 끝나고 그 사실을 알린 뒤 다시 시작할 수 있다 */
+  {
+    info('막다른 낱말: 이을 낱말이 없는 need를 심고 라운드 전환을 태운다');
+    await waitPhase(A.page, 'play', 8000).catch(() => {});
+
+    // 사전에 없는 첫 글자를 고른다 — 후보 중 findHint가 null을 주는 것.
+    const deadNeed = await A.page.evaluate(() =>
+      ['슭','뷁','쭑','촽','옭','릙'].find(c => !findHint(c, WORD_ALL, [])) || null);
+    report('막다른 낱말: 이을 수 없는 글자를 찾음', !!deadNeed, String(deadNeed));
+
+    if (deadNeed){
+      const roundBefore = Number(await round(A.page));
+      // 호스트가 라운드를 넘기는 시점(reveal → play)에 판정하므로 reveal로 만들어 태운다.
+      await A.page.evaluate((n) => MG.ref.child('meta').transaction(cur => {
+        if(!cur) return;
+        cur.need = n; cur.phase = 'reveal';
+        cur.winner = MG.uid; cur.winnerName = MG.name; cur.answer = '테스트';
+        return cur;
+      }), deadNeed);
+
+      const wentOver = await waitFor(A.page, () => MG.meta && MG.meta.phase === 'over', [],
+        { timeout: 12000, label: 'A가 over로 넘어감' }).catch(() => false);
+      report('막다른 낱말: 라운드가 남아 있어도 게임이 끝남', !!wentOver);
+
+      const overB = await waitFor(B.page, () => MG.meta && MG.meta.phase === 'over', [],
+        { timeout: 8000, label: 'B도 over를 봄' }).catch(() => false);
+      report('막다른 낱말: 상대(B)도 종료를 봄', !!overB);
+
+      const roundAtOver = Number(await A.page.evaluate(() => MG.meta.round));
+      report('막다른 낱말: 종료 시 라운드는 올라가지 않음', roundAtOver === roundBefore,
+        roundBefore + ' → ' + roundAtOver);
+
+      const endText = await A.page.$eval('#multi-endtext', e => e.textContent);
+      report('막다른 낱말: 종료 화면이 이유를 알려줌', endText.includes('더 이을 낱말이 없어'),
+        endText);
+
+      // 다시 시작 — 새 문제는 반드시 이을 낱말이 있어야 한다.
+      await A.page.click('#multi-restart');
+      const restarted = await waitFor(A.page, (r) =>
+        MG.meta && MG.meta.phase === 'play' && MG.meta.round === 1 && MG.meta.need !== r,
+        [deadNeed], { timeout: 8000, label: '새 게임이 시작됨' }).catch(() => false);
+      report('막다른 낱말: 다시 시작하면 새 게임이 열림', !!restarted);
+
+      const freshNeed = await need(A.page);
+      const canContinue = await A.page.evaluate((n) => {
+        const used = Object.values((MG.meta && MG.meta.chain) || {});
+        return !!findHint(n, WORD_ALL, used);
+      }, freshNeed);
+      report('막다른 낱말: 새 문제는 이을 낱말이 있음', canContinue === true, 'need=' + freshNeed);
+
+      gameIdsUsed.add(await A.page.evaluate(() => MG.meta.gameId));
+    } else {
+      report('막다른 낱말: 라운드가 남아 있어도 게임이 끝남', false, '이을 수 없는 글자를 못 찾아 건너뜀');
+      report('막다른 낱말: 상대(B)도 종료를 봄', false, '위와 동일');
+      report('막다른 낱말: 종료 시 라운드는 올라가지 않음', false, '위와 동일');
+      report('막다른 낱말: 종료 화면이 이유를 알려줌', false, '위와 동일');
+      report('막다른 낱말: 다시 시작하면 새 게임이 열림', false, '위와 동일');
+      report('막다른 낱말: 새 문제는 이을 낱말이 있음', false, '위와 동일');
+    }
   }
 
   /* 4) 호스트 승계 — 호스트가 탭을 닫아도 남은 쪽이 진행 */
