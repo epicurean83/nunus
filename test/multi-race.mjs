@@ -858,11 +858,16 @@ try{
     report('막다른 낱말: 이을 수 없는 글자를 찾음', !!deadNeed, String(deadNeed));
 
     if (deadNeed){
-      const roundBefore = Number(await round(A.page));
+      // 라운드를 MULTI_ROUNDS보다 한참 낮게 못박는다 — 이전 블록에서 쌓인 라운드 수가
+      // 우연히 MULTI_ROUNDS 근처면 chainRoundOutcome은 라운드 소진 체크가 먼저 걸려
+      // 여전히 'over'를 주지만, 종료 화면의 deadEnd 판정(round < MULTI_ROUNDS)은
+      // false가 되어 문구가 달라진다. 이전에 무엇이 실행됐든 막다른 낱말 경로임이
+      // 분명하도록 여기서 고정한다.
+      const roundBefore = 1;
       // 호스트가 라운드를 넘기는 시점(reveal → play)에 판정하므로 reveal로 만들어 태운다.
       await A.page.evaluate((n) => MG.ref.child('meta').transaction(cur => {
         if(!cur) return;
-        cur.need = n; cur.phase = 'reveal';
+        cur.need = n; cur.phase = 'reveal'; cur.round = 1;
         cur.winner = MG.uid; cur.winnerName = MG.name; cur.answer = '테스트';
         return cur;
       }), deadNeed);
