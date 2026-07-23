@@ -9,7 +9,7 @@ const CORE_NAMES = [
   'chainCheck','WORD_DICT','isHangulSyllable','SEED_WORDS',
   'hintStages','hintDisplay','hasContinuation','findHint',
   'chosungOf','chosungHint',
-  'pickHost','swapOutcome','nickChange','inputLock','chainRoundOutcome'
+  'pickHost','swapOutcome','nickChange','inputLock'
 ];
 
 function loadCore(){
@@ -637,46 +637,4 @@ test('inputLock: 알 수 없는 온라인 상태(undefined 또는 누락)는 둘
   assert.deepEqual(
     inputLock({ phase:'play', editing:false, busy:false, voting:false }),
     { input:false, submit:false }, 'online: 누락');
-});
-
-test('chainRoundOutcome: 초성게임은 이을 낱말과 무관하게 라운드 수로만 끝난다', () => {
-  const { chainRoundOutcome } = loadCore();
-  const base = { mode:'chosung', maxRounds:10, need:'슭', used:[], words:['가지','나비'] };
-  assert.equal(chainRoundOutcome({ ...base, round:3 }),  'next');
-  assert.equal(chainRoundOutcome({ ...base, round:10 }), 'over');
-});
-
-test('chainRoundOutcome: 끝말잇기에서 라운드가 남고 이을 낱말이 있으면 계속한다', () => {
-  const { chainRoundOutcome } = loadCore();
-  assert.equal(chainRoundOutcome({
-    mode:'chain', round:3, maxRounds:10, need:'나', used:['가나'], words:['가나','나비']
-  }), 'next');
-});
-
-test('chainRoundOutcome: 끝말잇기에서 이을 낱말이 없으면 라운드가 남아도 끝낸다', () => {
-  const { chainRoundOutcome } = loadCore();
-  assert.equal(chainRoundOutcome({
-    mode:'chain', round:3, maxRounds:10, need:'슭', used:['가나'], words:['가나','나비']
-  }), 'over');
-});
-
-test('chainRoundOutcome: 이미 쓴 낱말밖에 없으면 이을 수 없는 것으로 본다', () => {
-  const { chainRoundOutcome } = loadCore();
-  assert.equal(chainRoundOutcome({
-    mode:'chain', round:3, maxRounds:10, need:'나', used:['나비'], words:['가나','나비']
-  }), 'over');
-});
-
-test('chainRoundOutcome: 마지막 라운드는 이을 낱말이 있어도 끝낸다', () => {
-  const { chainRoundOutcome } = loadCore();
-  assert.equal(chainRoundOutcome({
-    mode:'chain', round:10, maxRounds:10, need:'나', used:['가나'], words:['가나','나비']
-  }), 'over');
-});
-
-test('chainRoundOutcome: round가 maxRounds를 넘어서도 끝낸다', () => {
-  const { chainRoundOutcome } = loadCore();
-  assert.equal(chainRoundOutcome({
-    mode:'chain', round:11, maxRounds:10, need:'나', used:[], words:['나비']
-  }), 'over');
 });
